@@ -17,57 +17,56 @@ async def calculate_keyword_score(message: str) -> Tuple[float, List[str]]:
     message_lower = message.lower()
     all_keywords = get_all_scam_keywords()
     matched_keywords = []
-    
-    for keyword in all_keywords:
-        if keyword in message_lower:
-            matched_keywords.append(keyword)
-    
+
+    matched_keywords.extend(
+        keyword for keyword in all_keywords if keyword in message_lower
+    )
     if not matched_keywords:
         return 0.0, []
-    
+
     # Increased base score per keyword (was 0.15, now 0.2)
     base_score = min(len(matched_keywords) * 0.2, 0.6)
-    
+
     categories = get_keyword_categories()
     category_bonus = 0.0
     matched_categories = set()
-    
+
     for category, keywords in categories.items():
         for keyword in keywords:
             if keyword in message_lower:
                 matched_categories.add(category)
                 break
-    
+
     # Increased category bonus (was 0.1, now 0.15)
     category_bonus = len(matched_categories) * 0.15
-    
+
     return min(base_score + category_bonus, 1.0), matched_keywords
 
 
 async def calculate_intent_score(message: str) -> float:
     message_lower = message.lower()
     score = 0.0
-    
+
     # Increased threat weight (was 0.2/0.4, now 0.3/0.5)
-    threat_count = sum(1 for k in THREAT_KEYWORDS if k in message_lower)
+    threat_count = sum(k in message_lower for k in THREAT_KEYWORDS)
     if threat_count > 0:
         score += min(threat_count * 0.3, 0.5)
-    
+
     # Increased urgency weight (was 0.15/0.3, now 0.2/0.4)
-    urgency_count = sum(1 for k in URGENCY_KEYWORDS if k in message_lower)
+    urgency_count = sum(k in message_lower for k in URGENCY_KEYWORDS)
     if urgency_count > 0:
         score += min(urgency_count * 0.2, 0.4)
-    
+
     # Credential requests are high priority (was 0.25/0.5, now 0.3/0.6)
-    credential_count = sum(1 for k in CREDENTIAL_KEYWORDS if k in message_lower)
+    credential_count = sum(k in message_lower for k in CREDENTIAL_KEYWORDS)
     if credential_count > 0:
         score += min(credential_count * 0.3, 0.6)
-    
+
     # Payment keywords (was 0.15/0.3, now 0.2/0.4)
-    payment_count = sum(1 for k in PAYMENT_KEYWORDS if k in message_lower)
+    payment_count = sum(k in message_lower for k in PAYMENT_KEYWORDS)
     if payment_count > 0:
         score += min(payment_count * 0.2, 0.4)
-    
+
     return min(score, 1.0)
 
 
