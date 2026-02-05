@@ -383,24 +383,50 @@ def _get_genai_client():
     return _genai_client
 
 
-def select_persona_for_scam(scam_category: ScamCategory, turn_count: int = 0) -> PersonaType:
+def _ensure_persona_type(persona_type) -> PersonaType:
+    if isinstance(persona_type, PersonaType):
+        return persona_type
+    if isinstance(persona_type, str):
+        try:
+            return PersonaType(persona_type)
+        except ValueError:
+            pass
+    return PersonaType.TECH_NAIVE
+
+
+def _ensure_scam_category(scam_category) -> ScamCategory:
+    if isinstance(scam_category, ScamCategory):
+        return scam_category
+    if isinstance(scam_category, str):
+        try:
+            return ScamCategory(scam_category)
+        except ValueError:
+            pass
+    return ScamCategory.UNKNOWN
+
+
+def select_persona_for_scam(scam_category, turn_count: int = 0) -> PersonaType:
+    scam_category = _ensure_scam_category(scam_category)
     candidates = SCAM_PERSONA_MAPPING.get(scam_category, SCAM_PERSONA_MAPPING[ScamCategory.UNKNOWN])
     if turn_count <= 2:
         return candidates[0]
     return random.choice(candidates)
 
 
-def get_persona_profile(persona_type: PersonaType) -> PersonaProfile:
+def get_persona_profile(persona_type) -> PersonaProfile:
+    persona_type = _ensure_persona_type(persona_type)
     return PERSONA_PROFILES.get(persona_type, PERSONA_PROFILES[PersonaType.TECH_NAIVE])
 
 
 async def generate_persona_response(
-    persona_type: PersonaType,
-    scam_category: ScamCategory,
+    persona_type,
+    scam_category,
     scammer_message: str,
     conversation_history: List[dict],
     turn_count: int
 ) -> str:
+    persona_type = _ensure_persona_type(persona_type)
+    scam_category = _ensure_scam_category(scam_category)
     if settings.gemini_api_key:
         try:
             return await _generate_ai_persona_response(
@@ -483,7 +509,8 @@ def _generate_template_response(persona_type: PersonaType, turn_count: int) -> s
         return random.choice(all_responses)
 
 
-def get_exit_response(persona_type: PersonaType) -> str:
+def get_exit_response(persona_type) -> str:
+    persona_type = _ensure_persona_type(persona_type)
     profile = get_persona_profile(persona_type)
     return random.choice(profile.exit_phrases)
 
@@ -491,8 +518,9 @@ def get_exit_response(persona_type: PersonaType) -> str:
 async def adapt_response_to_context(
     base_response: str,
     scammer_message: str,
-    scam_category: ScamCategory
+    scam_category
 ) -> str:
+    scam_category = _ensure_scam_category(scam_category)
     scammer_lower = scammer_message.lower()
     
     if any(kw in scammer_lower for kw in ["otp", "pin", "password", "cvv"]):

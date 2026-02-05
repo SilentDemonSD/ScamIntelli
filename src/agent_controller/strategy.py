@@ -1,11 +1,12 @@
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Union
 from src.models import SessionState, AgentReply, PersonaStyle, ExtractedIntelligence
 from src.scam_detector.classifier import detect_scam
 from src.scam_detector.scam_types import ScamCategory, detect_scam_category, get_scam_profile
 from src.intelligence_extractor.extractor import extract_all_intelligence, has_sufficient_intelligence
 from src.persona_engine.personas import (
     PersonaType, select_persona_for_scam, generate_persona_response,
-    get_exit_response, adapt_response_to_context, get_persona_profile
+    get_exit_response, adapt_response_to_context, get_persona_profile,
+    _ensure_persona_type, _ensure_scam_category
 )
 from src.security.tamper_proof import ResponseObfuscator
 from src.session_manager.session_store import update_session
@@ -91,9 +92,10 @@ class EngagementStrategy:
     def should_continue_engagement(
         cls,
         session: SessionState,
-        scam_category: ScamCategory,
+        scam_category,
         intel: ExtractedIntelligence
     ) -> Tuple[bool, str]:
+        scam_category = _ensure_scam_category(scam_category)
         config = cls.get_config(scam_category)
         
         if session.turn_count >= config["max_turns"]:
@@ -136,9 +138,9 @@ async def process_message(session: SessionState, message: str) -> Tuple[SessionS
     
     if newly_detected:
         session.scam_detected = True
-        session.scam_category = scam_category
+        session.scam_category = scam_category.value if hasattr(scam_category, 'value') else str(scam_category)
         persona_type = select_persona_for_scam(scam_category, session.turn_count)
-        session.persona_type = persona_type
+        session.persona_type = persona_type.value if hasattr(persona_type, 'value') else str(persona_type)
         session.persona_style = _map_persona_to_style(persona_type)
     
     session.extracted_intel = await extract_all_intelligence(message, session.extracted_intel)
@@ -146,16 +148,16 @@ async def process_message(session: SessionState, message: str) -> Tuple[SessionS
     session = await _update_state(session, message, "scammer")
     
     should_continue, end_reason = EngagementStrategy.should_continue_engagement(
-        session, getattr(session, 'scam_category', ScamCategory.UNKNOWN), session.extracted_intel
+        session, session.scam_category or ScamCategory.UNKNOWN, session.extracted_intel
     )
     
     if not should_continue:
         session.engagement_active = False
-        persona_type = getattr(session, 'persona_type', PersonaType.TECH_NAIVE)
+        persona_type = _ensure_persona_type(session.persona_type)
         reply_text = get_exit_response(persona_type)
     elif session.scam_detected and session.engagement_active:
-        persona_type = getattr(session, 'persona_type', PersonaType.TECH_NAIVE)
-        scam_cat = getattr(session, 'scam_category', ScamCategory.UNKNOWN)
+        persona_type = _ensure_persona_type(session.persona_type)
+        scam_cat = _ensure_scam_category(session.scam_category)
         
         reply_text = await generate_persona_response(
             persona_type, scam_cat, message, session.messages, session.turn_count
@@ -168,7 +170,7 @@ async def process_message(session: SessionState, message: str) -> Tuple[SessionS
             reply_text, profile.language_style, add_fillers=(session.turn_count > 1)
         )
     elif session.scam_detected:
-        persona_type = getattr(session, 'persona_type', PersonaType.TECH_NAIVE)
+        persona_type = _ensure_persona_type(session.persona_type)
         reply_text = get_exit_response(persona_type)
     else:
         reply_text = "Thank you for your message."
@@ -185,7 +187,8 @@ async def process_message(session: SessionState, message: str) -> Tuple[SessionS
     )
 
 
-def _map_persona_to_style(persona_type: PersonaType) -> PersonaStyle:
+def _map_persona_to_style(persona_type) -> PersonaStyle:
+    persona_type = _ensure_persona_type(persona_type)
     anxious_personas = {
         PersonaType.ELDERLY_ANXIOUS, PersonaType.SCARED_VICTIM,
         PersonaType.WORRIED_PARENT, PersonaType.LONELY_SENIOR
@@ -233,8 +236,8 @@ async def get_engagement_summary(session: SessionState) -> dict:
     from src.agent_controller.agent_state import generate_agent_notes
     
     notes = await generate_agent_notes(session)
-    scam_category = getattr(session, 'scam_category', ScamCategory.UNKNOWN)
-    persona_type = getattr(session, 'persona_type', PersonaType.TECH_NAIVE)
+    scam_category = _ensure_scam_category(getattr(session, 'scam_category', None))
+    persona_type = _ensure_persona_type(getattr(session, 'persona_type', None))
     
     return {
         "session_id": session.session_id,

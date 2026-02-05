@@ -10,15 +10,16 @@ settings = get_settings()
 logger = get_logger(__name__)
 
 _HTTP_CLIENT: Optional[httpx.AsyncClient] = None
-_RETRY_DELAYS = (1.0, 2.0, 4.0)
+_RETRY_DELAYS = (0.5, 1.0, 2.0)
 
 
 async def get_http_client() -> httpx.AsyncClient:
     global _HTTP_CLIENT
     if _HTTP_CLIENT is None or _HTTP_CLIENT.is_closed:
         _HTTP_CLIENT = httpx.AsyncClient(
-            timeout=httpx.Timeout(10.0, connect=5.0),
-            limits=httpx.Limits(max_connections=100, max_keepalive_connections=20)
+            timeout=httpx.Timeout(30.0, connect=10.0, read=20.0, write=10.0),
+            limits=httpx.Limits(max_connections=50, max_keepalive_connections=10),
+            http2=True
         )
     return _HTTP_CLIENT
 

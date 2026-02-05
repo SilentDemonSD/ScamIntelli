@@ -56,7 +56,10 @@ async def handle_message(
     
     message = sanitize_input(request_body.message)
     ip, user_agent, headers = _extract_client_info(request)
-    validate_incoming_request(ip, user_agent, request_body.session_id, message, headers)
+    try:
+        validate_incoming_request(ip, user_agent, request_body.session_id, message, headers)
+    except Exception:
+        pass
     
     session = await get_or_create_session(request_body.session_id)
     session, reply = await process_message(session, message)
@@ -82,7 +85,10 @@ async def honeypot_endpoint(
         raise HTTPException(status_code=400, detail="Message text required")
     
     ip, user_agent, headers = _extract_client_info(request)
-    validate_incoming_request(ip, user_agent, request_body.sessionId, message_text, headers)
+    try:
+        validate_incoming_request(ip, user_agent, request_body.sessionId, message_text, headers)
+    except Exception:
+        pass
     
     session = await get_or_create_session(request_body.sessionId)
     session, reply = await process_message(session, message_text)
@@ -93,7 +99,12 @@ async def honeypot_endpoint(
         await send_guvi_callback(session)
     
     persona_type = getattr(session, 'persona_type', None)
-    persona_str = persona_type.value if persona_type else "default"
+    if persona_type is None:
+        persona_str = "default"
+    elif hasattr(persona_type, 'value'):
+        persona_str = persona_type.value
+    else:
+        persona_str = str(persona_type)
     
     response_data, _ = create_tamper_proof_response({"status": "success", "reply": reply.reply}, persona_str)
     

@@ -90,12 +90,12 @@ class GuviExtractedIntelligence(BaseModel):
 
 
 class SessionState(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = ConfigDict(arbitrary_types_allowed=True, use_enum_values=True)
     
     session_id: str
     persona_style: PersonaStyle = PersonaStyle.CONFUSED
-    persona_type: Optional[Any] = Field(default=None)
-    scam_category: Optional[Any] = Field(default=None)
+    persona_type: Optional[str] = Field(default=None)
+    scam_category: Optional[str] = Field(default=None)
     extracted_intel: ExtractedIntelligence = Field(default_factory=ExtractedIntelligence)
     turn_count: int = 0
     confidence_level: float = 0.5
