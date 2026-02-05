@@ -1,26 +1,25 @@
-from typing import Tuple, Optional, Union, List, Dict
-from src.models import SessionState, AgentReply, PersonaStyle, ExtractedIntelligence
-from src.scam_detector.classifier import detect_scam
-from src.scam_detector.scam_types import ScamCategory, detect_scam_category, get_scam_profile
+from typing import Dict, List, Tuple
+
+from src.config import get_settings
 from src.intelligence_extractor.extractor import extract_all_intelligence, has_sufficient_intelligence
+from src.models import AgentReply, ExtractedIntelligence, PersonaStyle, SessionState
 from src.persona_engine.personas import (
-    PersonaType, select_persona_for_scam, generate_persona_response,
-    get_exit_response, adapt_response_to_context, get_persona_profile,
-    _ensure_persona_type, _ensure_scam_category, detect_scammer_language, LanguageStyle
+    LanguageStyle, PersonaType, _ensure_persona_type, _ensure_scam_category,
+    adapt_response_to_context, detect_scammer_language, generate_persona_response,
+    get_exit_response, get_persona_profile, select_persona_for_scam
 )
+from src.scam_detector.classifier import detect_scam
+from src.scam_detector.scam_types import ScamCategory, detect_scam_category
 from src.security.tamper_proof import ResponseObfuscator
 from src.session_manager.session_store import update_session
-from src.config import get_settings
 
 settings = get_settings()
 
 
 class ConversationContextTracker:
-    """Tracks conversation state and context for more coherent multi-turn responses"""
     
     @staticmethod
     def analyze_conversation_flow(messages: List[dict]) -> Dict[str, any]:
-        """Analyze conversation to extract key context for response generation"""
         context = {
             'scammer_urgency': 0,
             'agent_compliance_shown': 0,
@@ -40,35 +39,30 @@ class ConversationContextTracker:
         info_keywords = {'otp', 'pin', 'password', 'cvv', 'account', 'upi', 'aadhaar', 'pan'}
         compliance_keywords = {'okay', 'theek', 'haan', 'yes', 'alright', 'kar raha', 'sending'}
         
-        for msg in messages[-8:]:  # Analyze last 8 messages for context
+        for msg in messages[-8:]:
             content = msg.get('content', '').lower()
             role = msg.get('role', '')
             
             if role in ('user', 'scammer'):
-                # Track scammer's behavior
-                context['scammer_urgency'] += sum(1 for kw in urgency_keywords if kw in content)
-                context['threats_made'] += sum(1 for kw in threat_keywords if kw in content)
-                context['info_requested_count'] += sum(1 for kw in info_keywords if kw in content)
+                context['scammer_urgency'] += len([kw for kw in urgency_keywords if kw in content])
+                context['threats_made'] += len([kw for kw in threat_keywords if kw in content])
+                context['info_requested_count'] += len([kw for kw in info_keywords if kw in content])
                 
-                # Track topics scammer is pushing
-                if any(kw in content for kw in ['otp', 'pin', 'password']):
+                if any(kw in content for kw in ('otp', 'pin', 'password')):
                     context['last_scammer_topics'].append('credentials')
-                if any(kw in content for kw in ['pay', 'transfer', 'send', 'upi']):
+                if any(kw in content for kw in ('pay', 'transfer', 'send', 'upi')):
                     context['last_scammer_topics'].append('payment')
-                if any(kw in content for kw in ['arrest', 'police', 'legal']):
+                if any(kw in content for kw in ('arrest', 'police', 'legal')):
                     context['last_scammer_topics'].append('threat')
                     
             elif role == 'agent':
-                # Track agent's shown compliance
-                context['agent_compliance_shown'] += sum(1 for kw in compliance_keywords if kw in content)
+                context['agent_compliance_shown'] += len([kw for kw in compliance_keywords if kw in content])
                 
-                # Track pending actions mentioned by agent
-                if any(phrase in content for phrase in ['dhundh raha', 'check kar', 'looking', 'finding']):
+                if any(phrase in content for phrase in ('dhundh raha', 'check kar', 'looking', 'finding')):
                     context['pending_actions'].append('searching')
-                if any(phrase in content for phrase in ['bank ja', 'atm', 'withdraw']):
+                if any(phrase in content for phrase in ('bank ja', 'atm', 'withdraw')):
                     context['pending_actions'].append('going_to_bank')
         
-        # Determine emotional state based on threats
         if context['threats_made'] > 2:
             context['emotional_state'] = 'fearful'
         elif context['scammer_urgency'] > 3:
@@ -76,17 +70,13 @@ class ConversationContextTracker:
         elif context['agent_compliance_shown'] > 2:
             context['emotional_state'] = 'compliant'
         
-        # Track scammer language trend
-        scammer_msgs = [m.get('content', '') for m in messages[-4:] if m.get('role') in ('user', 'scammer')]
-        if scammer_msgs:
-            combined_scammer_text = ' '.join(scammer_msgs)
-            context['scammer_language_trend'] = detect_scammer_language(combined_scammer_text)
+        if scammer_msgs := [m.get('content', '') for m in messages[-4:] if m.get('role') in ('user', 'scammer')]:
+            context['scammer_language_trend'] = detect_scammer_language(' '.join(scammer_msgs))
         
         return context
     
     @staticmethod
     def get_contextual_response_hint(context: Dict[str, any], turn_count: int) -> str:
-        """Generate a hint for AI to maintain conversation coherence"""
         hints = []
         
         if context['emotional_state'] == 'fearful':
@@ -198,25 +188,23 @@ class EngagementStrategy:
         if session.turn_count >= config["max_turns"]:
             return False, "max_turns_reached"
         
-        intel_score = 0
-        if intel.upi_ids:
-            intel_score += 3
-        if intel.bank_accounts:
-            intel_score += 3
-        if intel.phishing_links:
-            intel_score += 4
-        if intel.phone_numbers:
-            intel_score += 1
+        intel_score = (
+            (3 if intel.upi_ids else 0) +
+            (3 if intel.bank_accounts else 0) +
+            (4 if intel.phishing_links else 0) +
+            (1 if intel.phone_numbers else 0)
+        )
         
         if intel_score >= 7 and session.turn_count >= 3:
             return False, "sufficient_intel"
         
         recent_msgs = session.messages[-4:] if len(session.messages) >= 4 else session.messages
-        payment_pressure = sum(
-            1 for m in recent_msgs
+        payment_keywords = {'pay', 'send', 'transfer', 'now', 'immediately'}
+        payment_pressure = len([
+            m for m in recent_msgs
             if m.get('role') in ('user', 'scammer') and
-            any(kw in m.get('content', '').lower() for kw in ['pay', 'send', 'transfer', 'now', 'immediately'])
-        )
+            any(kw in m.get('content', '').lower() for kw in payment_keywords)
+        ])
         if payment_pressure >= 3:
             return False, "payment_pressure"
         
@@ -229,11 +217,9 @@ async def process_message(session: SessionState, message: str) -> Tuple[SessionS
     scam_category = ScamCategory.UNKNOWN
     if scam_result.is_scam or session.scam_detected:
         all_keywords = session.extracted_intel.suspicious_keywords.copy()
-        scam_category, confidence = detect_scam_category(message, all_keywords)
+        scam_category, _ = detect_scam_category(message, all_keywords)
     
-    newly_detected = scam_result.is_scam and not session.scam_detected
-    
-    if newly_detected:
+    if scam_result.is_scam and not session.scam_detected:
         session.scam_detected = True
         session.scam_category = scam_category.value if hasattr(scam_category, 'value') else str(scam_category)
         persona_type = select_persona_for_scam(scam_category, session.turn_count)
@@ -244,7 +230,7 @@ async def process_message(session: SessionState, message: str) -> Tuple[SessionS
     
     session = await _update_state(session, message, "scammer")
     
-    should_continue, end_reason = EngagementStrategy.should_continue_engagement(
+    should_continue, _ = EngagementStrategy.should_continue_engagement(
         session, session.scam_category or ScamCategory.UNKNOWN, session.extracted_intel
     )
     
