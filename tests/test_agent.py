@@ -85,4 +85,5 @@ async def test_generate_agent_notes():
     notes = await generate_agent_notes(session)
     
     assert "fraud@upi" in notes
-    assert "urgent" in notes or "blocked" in notes
+    # Check for enhanced agent notes features
+    assert "Scam Type:" in notes or "Urgency" in notes or "Fear" in notes

@@ -12,7 +12,6 @@ logger = get_logger(__name__)
 async def build_callback_payload(session: SessionState) -> GuviCallbackPayload:
     notes = await generate_agent_notes(session)
     
-    # Convert internal snake_case fields to GUVI's expected camelCase format
     guvi_intel = GuviExtractedIntelligence(
         bankAccounts=session.extracted_intel.bank_accounts,
         upiIds=session.extracted_intel.upi_ids,

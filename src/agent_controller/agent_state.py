@@ -64,27 +64,163 @@ async def check_end_conditions(session: SessionState) -> bool:
 
 
 async def generate_agent_notes(session: SessionState) -> str:
+    """Generate comprehensive agent notes summarizing the scam engagement."""
     notes_parts = []
-    
     intel = session.extracted_intel
     
+    # Determine scam category based on keywords
+    scam_type = _detect_scam_category(intel.suspicious_keywords)
+    if scam_type:
+        notes_parts.append(f"Scam Type: {scam_type}")
+    
+    # Engagement summary
+    notes_parts.append(f"Engagement: {session.turn_count} message exchanges")
+    
+    # Intelligence extracted
+    intel_items = []
     if intel.upi_ids:
-        notes_parts.append(f"Extracted UPI IDs: {', '.join(intel.upi_ids)}")
-    
-    if intel.phishing_links:
-        notes_parts.append(f"Detected phishing links: {len(intel.phishing_links)}")
-    
+        intel_items.append(f"UPI IDs: {', '.join(intel.upi_ids)}")
+    if intel.bank_accounts:
+        intel_items.append(f"Bank Accounts: {', '.join(intel.bank_accounts)}")
     if intel.phone_numbers:
-        notes_parts.append(f"Captured phone numbers: {', '.join(intel.phone_numbers)}")
+        intel_items.append(f"Phone Numbers: {', '.join(intel.phone_numbers)}")
+    if intel.phishing_links:
+        intel_items.append(f"Phishing URLs: {len(intel.phishing_links)} detected")
     
-    threat_keywords = [kw for kw in intel.suspicious_keywords if kw in ["urgent", "blocked", "suspend", "legal"]]
-    if threat_keywords:
-        notes_parts.append(f"Threat tactics used: {', '.join(threat_keywords)}")
+    if intel_items:
+        notes_parts.append(f"Intelligence Extracted: {'; '.join(intel_items)}")
     
-    if not notes_parts:
-        notes_parts.append(f"Engaged for {session.turn_count} turns")
+    # Threat tactics analysis
+    tactics = _analyze_threat_tactics(intel.suspicious_keywords)
+    if tactics:
+        notes_parts.append(f"Tactics Used: {tactics}")
+    
+    # Risk assessment
+    risk_level = _assess_risk_level(intel, session.turn_count)
+    notes_parts.append(f"Risk Level: {risk_level}")
+    
+    # Behavioral summary
+    behavior = _analyze_scammer_behavior(session.messages)
+    if behavior:
+        notes_parts.append(f"Behavior: {behavior}")
     
     return ". ".join(notes_parts)
+
+
+def _detect_scam_category(keywords: list) -> str:
+    """Detect the type of scam based on keywords."""
+    keywords_lower = [kw.lower() for kw in keywords]
+    
+    if any(kw in keywords_lower for kw in ['lottery', 'prize', 'won', 'winner', 'jackpot']):
+        return "Lottery/Prize Scam"
+    elif any(kw in keywords_lower for kw in ['kyc', 'verify', 'blocked', 'suspended', 'account will be blocked']):
+        return "KYC/Phishing Scam"
+    elif any(kw in keywords_lower for kw in ['invest', 'returns', 'profit', 'trading', 'crypto']):
+        return "Investment Fraud"
+    elif any(kw in keywords_lower for kw in ['job', 'work from home', 'part time', 'salary']):
+        return "Job Scam"
+    elif any(kw in keywords_lower for kw in ['police', 'arrest', 'legal', 'customs', 'parcel']):
+        return "Impersonation/Authority Scam"
+    elif any(kw in keywords_lower for kw in ['otp', 'pin', 'password', 'cvv']):
+        return "Credential Theft Attempt"
+    elif any(kw in keywords_lower for kw in ['transfer', 'send money', 'pay', 'advance']):
+        return "Payment Fraud"
+    return "Suspected Scam"
+
+
+def _analyze_threat_tactics(keywords: list) -> str:
+    """Analyze threat tactics used by scammer."""
+    tactics = []
+    keywords_lower = [kw.lower() for kw in keywords]
+    
+    # Urgency tactics
+    urgency_words = ['urgent', 'immediately', 'right now', 'today', 'expires', 'last chance']
+    if any(kw in keywords_lower for kw in urgency_words):
+        tactics.append("Urgency pressure")
+    
+    # Fear tactics
+    fear_words = ['blocked', 'suspended', 'legal action', 'arrest', 'police', 'fine']
+    if any(kw in keywords_lower for kw in fear_words):
+        tactics.append("Fear/Intimidation")
+    
+    # Authority impersonation
+    authority_words = ['bank', 'rbi', 'government', 'officer', 'official', 'customs']
+    if any(kw in keywords_lower for kw in authority_words):
+        tactics.append("Authority impersonation")
+    
+    # Greed exploitation
+    greed_words = ['prize', 'won', 'lottery', 'cashback', 'reward', 'bonus']
+    if any(kw in keywords_lower for kw in greed_words):
+        tactics.append("Greed exploitation")
+    
+    # Personal info request
+    info_words = ['otp', 'pin', 'password', 'cvv', 'account number']
+    if any(kw in keywords_lower for kw in info_words):
+        tactics.append("Personal info extraction")
+    
+    return ", ".join(tactics) if tactics else "Standard social engineering"
+
+
+def _assess_risk_level(intel, turn_count: int) -> str:
+    """Assess the risk level of the scam attempt."""
+    risk_score = 0
+    
+    # Intelligence factors
+    if intel.upi_ids:
+        risk_score += 3
+    if intel.bank_accounts:
+        risk_score += 3
+    if intel.phishing_links:
+        risk_score += 4
+    if intel.phone_numbers:
+        risk_score += 1
+    
+    # Keyword factors
+    high_risk_keywords = ['otp', 'pin', 'password', 'cvv', 'transfer', 'send money']
+    if any(kw.lower() in high_risk_keywords for kw in intel.suspicious_keywords):
+        risk_score += 3
+    
+    # Engagement persistence
+    if turn_count >= 5:
+        risk_score += 2
+    
+    if risk_score >= 8:
+        return "HIGH - Active financial threat"
+    elif risk_score >= 4:
+        return "MEDIUM - Confirmed scam attempt"
+    else:
+        return "LOW - Potential scam"
+
+
+def _analyze_scammer_behavior(messages: list) -> str:
+    """Analyze scammer behavior patterns from message history."""
+    if not messages:
+        return ""
+    
+    behaviors = []
+    scammer_messages = [m for m in messages if m.get('role') == 'user']
+    
+    if len(scammer_messages) >= 3:
+        # Check for escalation
+        recent = scammer_messages[-3:]
+        payment_mentions = sum(1 for m in recent if any(
+            kw in m.get('content', '').lower() 
+            for kw in ['pay', 'send', 'transfer', 'upi', 'money']
+        ))
+        if payment_mentions >= 2:
+            behaviors.append("Escalating payment demands")
+    
+    # Check for repetition
+    if len(scammer_messages) >= 2:
+        contents = [m.get('content', '').lower() for m in scammer_messages]
+        if len(set(contents)) < len(contents) * 0.7:
+            behaviors.append("Repetitive messaging")
+    
+    # Check for persistence
+    if len(scammer_messages) >= 5:
+        behaviors.append("Persistent engagement")
+    
+    return ", ".join(behaviors) if behaviors else "Standard scam patterns"
 
 
 async def update_agent_state(

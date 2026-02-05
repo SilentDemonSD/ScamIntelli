@@ -60,20 +60,54 @@ async def extract_links(message: str) -> List[str]:
     return links
 
 
-async def extract_bank_references(message: str) -> List[str]:
+async def extract_bank_references(message: str, phone_numbers: List[str] = None) -> List[str]:
+    """Extract bank account numbers, excluding phone numbers."""
     card_matches = BANK_REF_PATTERN.findall(message)
     account_matches = ACCOUNT_PATTERN.findall(message)
     
+    # Get phone number digits for filtering
+    phone_digits = set()
+    if phone_numbers:
+        for phone in phone_numbers:
+            # Extract just the digits
+            digits = re.sub(r'\D', '', phone)
+            phone_digits.add(digits)
+            # Also add without country code
+            if digits.startswith('91') and len(digits) > 10:
+                phone_digits.add(digits[2:])
+    
+    # Banking context keywords
+    bank_context = ['account', 'a/c', 'acc', 'bank', 'ifsc', 'neft', 'imps', 'rtgs', 'transfer']
+    message_lower = message.lower()
+    has_bank_context = any(kw in message_lower for kw in bank_context)
+    
     references = []
     
+    # Card numbers (16 digits with potential formatting)
     for match in card_matches:
         cleaned = re.sub(r'[\s\-]', '', match)
-        if cleaned not in references:
+        if cleaned not in references and cleaned not in phone_digits:
             references.append(cleaned)
     
-    for match in account_matches:
-        if len(match) >= 9 and match not in references:
-            references.append(match)
+    # Account numbers - only if there's banking context
+    if has_bank_context:
+        for match in account_matches:
+            # Skip if it looks like a phone number (10 digits starting with 6-9)
+            if len(match) == 10 and match[0] in '6789':
+                continue
+            # Skip if it matches a known phone number
+            if match in phone_digits:
+                continue
+            # Skip years (4 digits between 1900-2100)
+            if len(match) == 4:
+                try:
+                    if 1900 <= int(match) <= 2100:
+                        continue
+                except:
+                    pass
+            # Valid account numbers are typically 9-18 digits
+            if len(match) >= 9 and match not in references:
+                references.append(match)
     
     return references
 
@@ -82,7 +116,10 @@ async def extract_all_intelligence(message: str, existing: ExtractedIntelligence
     upi_ids = await extract_upi_ids(message)
     phone_numbers = await extract_phone_numbers(message)
     links = await extract_links(message)
-    bank_refs = await extract_bank_references(message)
+    
+    # Get all known phone numbers for filtering
+    all_known_phones = list(set(existing.phone_numbers + phone_numbers))
+    bank_refs = await extract_bank_references(message, all_known_phones)
     
     from src.scam_detector.classifier import get_matched_keywords
     keywords = await get_matched_keywords(message)
