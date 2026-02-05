@@ -56,8 +56,10 @@ async def security_middleware(request: Request, call_next):
     jitter = random.uniform(0.05, 0.15)
     
     response.headers["X-Response-Time"] = f"{process_time + jitter:.3f}"
-    response.headers.pop("server", None)
-    response.headers.pop("x-powered-by", None)
+    
+    for header in ("server", "x-powered-by"):
+        if header in response.headers:
+            del response.headers[header]
     
     return response
 
