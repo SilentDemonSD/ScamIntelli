@@ -1,13 +1,23 @@
 from enum import Enum
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
 import random
+import re
 from google import genai
 from src.config import get_settings
 from src.scam_detector.scam_types import ScamCategory
 
 settings = get_settings()
 _genai_client = None
+
+
+class LanguageStyle(str, Enum):
+    PURE_HINDI = "pure_hindi"
+    PURE_ENGLISH = "pure_english"
+    HINGLISH_HEAVY_HINDI = "hinglish_heavy_hindi"
+    HINGLISH_HEAVY_ENGLISH = "hinglish_heavy_english"
+    FORMAL_ENGLISH = "formal_english"
+    BROKEN_ENGLISH = "broken_english"
 
 
 class PersonaType(str, Enum):
@@ -383,6 +393,124 @@ def _get_genai_client():
     return _genai_client
 
 
+HINDI_PATTERNS = frozenset({
+    'kya', 'hai', 'haan', 'ji', 'nahi', 'aap', 'mein', 'mere', 'mera', 'meri',
+    'kaise', 'kahan', 'kyun', 'kab', 'kaun', 'kitna', 'abhi', 'kal', 'aaj',
+    'paisa', 'rupay', 'lakh', 'crore', 'khata', 'paise', 'bhej', 'bhejo',
+    'karo', 'karna', 'karenge', 'karunga', 'karungi', 'batao', 'bolo',
+    'samajh', 'pata', 'malum', 'theek', 'accha', 'sahi', 'galat',
+    'aapka', 'aapki', 'tumhara', 'unka', 'iska', 'uska', 'hamara',
+    'ruko', 'chalo', 'jaldi', 'abhi', 'baad', 'pehle', 'phir',
+    'gaya', 'gayi', 'gaye', 'raha', 'rahi', 'rahe', 'hoga', 'hogi',
+    'liye', 'wala', 'wali', 'wale', 'bohot', 'bahut', 'zyada', 'kam',
+    'bhai', 'didi', 'uncle', 'aunty', 'beta', 'beti', 'sir',
+    'block', 'ho', 'kar', 'de', 'le', 'ja', 'aa', 'lo', 'do', 'ke'
+})
+
+FORMAL_ENGLISH_PATTERNS = frozenset({
+    'kindly', 'please', 'immediately', 'urgent', 'regarding',
+    'verification', 'compliance', 'procedure', 'suspended', 'terminate',
+    'department', 'authority', 'investigation', 'confirmation', 'suspend',
+    'legal', 'action', 'notice', 'violation', 'penalty', 'deadline',
+    'dear', 'respected', 'hereby', 'therefore', 'furthermore', 'moreover',
+    'pursuant', 'accordance', 'regulations', 'mandatory', 'failure'
+})
+
+
+def detect_scammer_language(message: str, history: List[dict] = None) -> LanguageStyle:
+    text = message.lower()
+    words = set(re.findall(r'\b[a-zA-Z]+\b', text))
+    
+    hindi_count = len(words & HINDI_PATTERNS)
+    formal_count = len(words & FORMAL_ENGLISH_PATTERNS)
+    
+    has_devanagari = bool(re.search(r'[\u0900-\u097F]', message))
+    
+    if has_devanagari:
+        return LanguageStyle.PURE_HINDI
+    
+    total_words = len(words)
+    if total_words == 0:
+        return LanguageStyle.HINGLISH_HEAVY_HINDI
+    
+    hindi_ratio = hindi_count / total_words
+    formal_ratio = formal_count / total_words
+    
+    if hindi_ratio > 0.25:
+        return LanguageStyle.HINGLISH_HEAVY_HINDI
+    elif hindi_ratio > 0.1 and formal_ratio < 0.1:
+        return LanguageStyle.HINGLISH_HEAVY_ENGLISH
+    elif formal_ratio > 0.1 or (formal_count >= 2 and hindi_count == 0):
+        return LanguageStyle.FORMAL_ENGLISH
+    elif hindi_ratio > 0.05:
+        return LanguageStyle.HINGLISH_HEAVY_ENGLISH
+    else:
+        return LanguageStyle.HINGLISH_HEAVY_ENGLISH
+
+
+def get_language_instruction(lang_style: LanguageStyle, persona_type: PersonaType) -> str:
+    profile = PERSONA_PROFILES.get(persona_type, PERSONA_PROFILES[PersonaType.TECH_NAIVE])
+    tech_level = profile.tech_literacy
+    
+    if lang_style == LanguageStyle.FORMAL_ENGLISH:
+        if tech_level == "high":
+            return """LANGUAGE INSTRUCTION: The scammer is using formal English. 
+Respond in polite Hinglish - mix Hindi words naturally into English sentences.
+Example: "Sir, mujhe samajh nahi aa raha, can you explain properly?"
+Use respectful tone but show confusion. Don't use pure English."""
+        elif tech_level == "medium":
+            return """LANGUAGE INSTRUCTION: The scammer is using formal English.
+Respond in broken/simple English mixed with Hindi. Show you're trying to understand.
+Example: "Sorry sir, I am not understanding properly. Kya problem hai exactly?"
+Grammar mistakes are natural."""
+        else:
+            return """LANGUAGE INSTRUCTION: The scammer is using formal English.
+Respond primarily in Hindi with very basic English words. Show you don't understand well.
+Example: "Sir, English mein samajh nahi aata. Hindi mein bolo please."
+Be hesitant and confused with English terms."""
+    
+    elif lang_style == LanguageStyle.PURE_HINDI:
+        return """LANGUAGE INSTRUCTION: The scammer is speaking Hindi.
+Respond naturally in Hindi/Hinglish matching the persona's regional style.
+Use colloquial Hindi expressions and filler words."""
+    
+    else:
+        return """LANGUAGE INSTRUCTION: The scammer is using Hinglish (mixed Hindi-English).
+Match their style - respond in natural Hinglish.
+Mix Hindi and English words fluidly as Indians naturally do.
+Example: "Acha, but mujhe verify karna padega na bank se?"
+Include common Hinglish expressions."""
+
+
+HINGLISH_RESPONSES_BY_CONTEXT = {
+    "formal_english_confusion": [
+        "Sir, aapki English mein samajh nahi aa raha... kya problem hai?",
+        "Please thoda simple mein batao, I am not getting clearly.",
+        "Acha acha, but main confused hun. Hindi mein explain karo na.",
+        "Sir ji, yeh verification wala part samajh nahi aaya mujhe.",
+        "Sorry, mera English weak hai. Kya karna hai exactly?",
+    ],
+    "formal_english_compliance": [
+        "Okay sir, aap jo bologe main karunga. Bas clear batao.",
+        "Ji haan, I understand. Proceed kaise karna hai?",
+        "Theek hai sir, aapke instructions follow karunga.",
+        "Alright, mujhe step by step batao please.",
+    ],
+    "formal_english_fear": [
+        "Sir please, mujhe bahut tension ho rahi hai. Kya arrest hoga?",
+        "Oh god, main kya karun? Please help me sir!",
+        "Sir I am very scared, please tell what to do now.",
+        "Yeh legal matter hai? Meri family ko pata chalega kya?",
+    ],
+    "casual_stall": [
+        "Ek minute ruko, phone ka battery low hai.",
+        "Abhi busy hun thoda, 5 minute mein call back karta hun.",
+        "Net slow chal raha hai, reconnect karna padega.",
+        "Hold on, koi door pe hai. Abhi aata hun.",
+    ]
+}
+
+
 def _ensure_persona_type(persona_type) -> PersonaType:
     if isinstance(persona_type, PersonaType):
         return persona_type
@@ -427,14 +555,18 @@ async def generate_persona_response(
 ) -> str:
     persona_type = _ensure_persona_type(persona_type)
     scam_category = _ensure_scam_category(scam_category)
+    
+    scammer_lang = detect_scammer_language(scammer_message, conversation_history)
+    
     if settings.gemini_api_key:
         try:
             return await _generate_ai_persona_response(
-                persona_type, scam_category, scammer_message, conversation_history, turn_count
+                persona_type, scam_category, scammer_message, 
+                conversation_history, turn_count, scammer_lang
             )
         except Exception:
             pass
-    return _generate_template_response(persona_type, turn_count)
+    return _generate_template_response(persona_type, turn_count, scammer_lang)
 
 
 async def _generate_ai_persona_response(
@@ -442,48 +574,53 @@ async def _generate_ai_persona_response(
     scam_category: ScamCategory,
     scammer_message: str,
     conversation_history: List[dict],
-    turn_count: int
+    turn_count: int,
+    scammer_lang: LanguageStyle = LanguageStyle.HINGLISH_HEAVY_ENGLISH
 ) -> str:
     client = _get_genai_client()
     if client is None:
         raise ValueError("No API client")
 
     profile = get_persona_profile(persona_type)
+    lang_instruction = get_language_instruction(scammer_lang, persona_type)
     
     history_text = "\n".join([
         f"{'Scammer' if m.get('role') in ('user', 'scammer') else 'Me'}: {m.get('content', '')}"
         for m in conversation_history[-6:]
     ])
 
-    prompt = f"""You are roleplaying as a potential scam victim to engage and waste a scammer's time while gathering intelligence.
+    prompt = f"""You are roleplaying as a potential scam victim in India to engage and waste a scammer's time while gathering intelligence.
 
 PERSONA DETAILS:
 - Type: {profile.occupation} ({profile.age_range[0]}-{profile.age_range[1]} years old)
 - Tech literacy: {profile.tech_literacy}
-- Language style: {profile.language_style}
-- Emotional state: {', '.join(profile.emotional_triggers)}
+- Base language style: {profile.language_style}
+- Emotional triggers: {', '.join(profile.emotional_triggers)}
 
 SCAM TYPE DETECTED: {scam_category.value}
 
+{lang_instruction}
+
 CRITICAL RULES:
-1. NEVER reveal you know it's a scam or mention "scam", "fraud", "fake", "cheat"
-2. NEVER mention AI, bot, honeypot, or system
-3. Use natural language mixing Hindi/English based on persona
-4. Show genuine emotions matching the persona (fear, confusion, trust, greed)
-5. Ask naive questions to extract more information
-6. Delay giving sensitive information but seem willing
-7. Keep responses SHORT (1-2 sentences max)
-8. Match the persona's vocabulary and grammar level
-9. Include realistic typing delays/mistakes for low-tech personas
+1. NEVER reveal you know it's a scam - no words like "scam", "fraud", "fake", "cheat", "dhoka"
+2. NEVER mention AI, bot, honeypot, system, or that you're testing
+3. Adapt your language based on scammer's language style - if they speak formal English, respond in Hinglish showing slight confusion
+4. Show GENUINE emotions: fear for arrest scams, greed for lottery, confusion for tech issues
+5. Ask naive questions to extract more info (phone number, UPI, bank details, links)
+6. Delay giving sensitive information but ALWAYS seem willing eventually
+7. Keep responses SHORT (1-2 sentences max, like real SMS/WhatsApp)
+8. Include realistic hesitations: "umm", "ek minute", "wait wait"
+9. For elderly/low-tech personas: use simpler words, more confusion
+10. Make it feel like a REAL conversation - not scripted
 
 RECENT CONVERSATION:
 {history_text}
 
-SCAMMER'S MESSAGE: {scammer_message}
+SCAMMER'S CURRENT MESSAGE: "{scammer_message}"
 
 TURN NUMBER: {turn_count}
 
-Generate a single realistic response as this persona. Response only, no explanation:"""
+Generate ONE short, realistic response as this persona. Just the response text, nothing else:"""
 
     response = await client.aio.models.generate_content(
         model="gemini-2.0-flash",
@@ -493,11 +630,28 @@ Generate a single realistic response as this persona. Response only, no explanat
     text = response.text.strip()
     if text.startswith('"') and text.endswith('"'):
         text = text[1:-1]
+    if text.startswith("'") and text.endswith("'"):
+        text = text[1:-1]
     return text
 
 
-def _generate_template_response(persona_type: PersonaType, turn_count: int) -> str:
+def _generate_template_response(
+    persona_type: PersonaType, 
+    turn_count: int,
+    scammer_lang: LanguageStyle = LanguageStyle.HINGLISH_HEAVY_ENGLISH
+) -> str:
     profile = get_persona_profile(persona_type)
+    
+    if scammer_lang == LanguageStyle.FORMAL_ENGLISH:
+        if profile.tech_literacy in ("very_low", "low"):
+            context = "formal_english_confusion"
+        elif any(t in profile.emotional_triggers for t in ("fear", "fear_of_police", "scared")):
+            context = "formal_english_fear"
+        else:
+            context = "formal_english_compliance"
+        
+        if context in HINGLISH_RESPONSES_BY_CONTEXT:
+            return random.choice(HINGLISH_RESPONSES_BY_CONTEXT[context])
     
     if turn_count <= 2:
         return random.choice(profile.typical_responses)
@@ -522,23 +676,51 @@ async def adapt_response_to_context(
 ) -> str:
     scam_category = _ensure_scam_category(scam_category)
     scammer_lower = scammer_message.lower()
+    scammer_lang = detect_scammer_language(scammer_message)
+    
+    is_formal = scammer_lang == LanguageStyle.FORMAL_ENGLISH
     
     if any(kw in scammer_lower for kw in ["otp", "pin", "password", "cvv"]):
-        delays = [
-            "Ek minute, dhundh raha hun...",
-            "Konsa OTP? Bahut saare messages aaye hain.",
-            "Password yaad nahi aa raha, ruko.",
-            "Phone mein bahut apps hain, konse wala?"
-        ]
+        if is_formal:
+            delays = [
+                "Sir, ek minute. OTP dhundh raha hun messages mein...",
+                "Which OTP sir? Bahut saare messages aaye hain.",
+                "Password yaad nahi aa raha, let me check my diary.",
+                "Sir please hold, phone mein bahut apps hain.",
+            ]
+        else:
+            delays = [
+                "Ek minute, dhundh raha hun...",
+                "Konsa OTP? Bahut saare messages aaye hain.",
+                "Password yaad nahi aa raha, ruko.",
+                "Phone mein bahut apps hain, konse wala?"
+            ]
         return random.choice(delays)
     
-    if any(kw in scammer_lower for kw in ["upi", "transfer", "send", "pay"]):
-        stalls = [
-            "Kitna bhejne ka hai exactly?",
-            "UPI ID kya hai aapka?",
-            "Account mein balance check karna padega.",
-            "Limit cross ho gayi hai aaj ki, kal chalega?"
-        ]
+    if any(kw in scammer_lower for kw in ["upi", "transfer", "send", "pay", "amount"]):
+        if is_formal:
+            stalls = [
+                "Sir, kitna amount transfer karna hai exactly?",
+                "Okay sir, but what is your UPI ID?",
+                "Let me check my account balance first sir.",
+                "Sir, aaj ka limit cross ho gaya. Tomorrow okay?"
+            ]
+        else:
+            stalls = [
+                "Kitna bhejne ka hai exactly?",
+                "UPI ID kya hai aapka?",
+                "Account mein balance check karna padega.",
+                "Limit cross ho gayi hai aaj ki, kal chalega?"
+            ]
         return random.choice(stalls)
+    
+    if any(kw in scammer_lower for kw in ["arrest", "police", "legal", "court", "case", "warrant"]):
+        fear_responses = [
+            "Sir please, mujhe bahut dar lag raha hai. Main kya karun?",
+            "Oh god, arrest? Meri family ko pata chalega kya?",
+            "Sir main innocent hun, please help me!",
+            "Kya jail hogi? Please sir, kuch karo!"
+        ]
+        return random.choice(fear_responses)
     
     return base_response
