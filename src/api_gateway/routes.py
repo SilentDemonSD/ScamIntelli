@@ -1,12 +1,14 @@
 from fastapi import APIRouter, HTTPException, Header, Depends
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from src.models import (
     MessageRequest,
     AgentReply,
     SessionResponse,
     EndSessionResponse,
-    HealthResponse
+    HealthResponse,
+    HoneypotRequest,
+    HoneypotSimpleResponse
 )
 from src.session_manager.session_store import (
     get_or_create_session,
@@ -51,6 +53,53 @@ async def handle_message(
         await send_guvi_callback(session)
     
     return reply
+
+
+@router.post("/honeypot", response_model=HoneypotSimpleResponse)
+async def honeypot_endpoint(
+    request: HoneypotRequest,
+    x_api_key: Optional[str] = Header(None, alias="x-api-key")
+):
+    """
+    GUVI Hackathon format honeypot endpoint.
+    
+    Accepts message object with sender, text, timestamp (epoch ms).
+    Returns simple response: {"status": "success", "reply": "..."}
+    Sends callback to GUVI when conversation is complete.
+    """
+    # Verify API key
+    if not x_api_key:
+        raise HTTPException(status_code=401, detail="API key required")
+    if x_api_key != settings.api_key:
+        raise HTTPException(status_code=403, detail="Invalid API key")
+    
+    # Extract message text from the hackathon format
+    if isinstance(request.message, dict):
+        message_text = request.message.get("text", "")
+    else:
+        message_text = request.message.text
+    
+    if not message_text:
+        raise HTTPException(status_code=400, detail="Message text required")
+    
+    # Get or create session
+    session = await get_or_create_session(request.sessionId)
+    
+    # Process message through our existing pipeline
+    session, reply = await process_message(session, message_text)
+    
+    # Determine if conversation should be complete (after 10 turns or engagement ended)
+    conversation_complete = not session.engagement_active or session.turn_count >= 10
+    
+    # Send callback if conversation is complete and scam was detected
+    if conversation_complete and session.scam_detected:
+        await send_guvi_callback(session)
+    
+    # Return simple format as GUVI expects
+    return HoneypotSimpleResponse(
+        status="success",
+        reply=reply.reply
+    )
 
 
 @router.get("/session/{session_id}", response_model=SessionResponse)
@@ -107,7 +156,7 @@ async def end_session(
 async def health_check():
     return HealthResponse(
         status="healthy",
-        timestamp=datetime.utcnow()
+        timestamp=datetime.now(timezone.utc)
     )
 
 
