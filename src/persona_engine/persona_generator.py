@@ -1,7 +1,9 @@
 import random
+
 from google import genai
-from src.models import PersonaStyle, SessionState
+
 from src.config import get_settings
+from src.models import PersonaStyle, SessionState
 
 settings = get_settings()
 
@@ -14,6 +16,7 @@ def _get_genai_client():
     if _genai_client is None and settings.gemini_api_key:
         _genai_client = genai.Client(api_key=settings.gemini_api_key)
     return _genai_client
+
 
 PERSONA_RESPONSES = {
     PersonaStyle.ANXIOUS: [
@@ -36,7 +39,7 @@ PERSONA_RESPONSES = {
         "Should I give you my details? Which ones?",
         "I trust you, please help me fix this.",
         "What information do you need from me?",
-    ]
+    ],
 }
 
 CLARIFICATION_RESPONSES = [
@@ -57,16 +60,14 @@ DELAY_RESPONSES = [
 
 
 async def generate_persona_response(
-    session: SessionState,
-    scammer_message: str,
-    use_ai: bool = True
+    session: SessionState, scammer_message: str, use_ai: bool = True
 ) -> str:
     if use_ai and settings.gemini_api_key:
         try:
             return await _generate_ai_response(session, scammer_message)
         except Exception:
             pass
-    
+
     return await _generate_template_response(session)
 
 
@@ -74,12 +75,14 @@ async def _generate_ai_response(session: SessionState, scammer_message: str) -> 
     client = _get_genai_client()
     if client is None:
         raise ValueError("Gemini API key not configured")
-    
-    conversation_history = "\n".join([
-        f"{'Scammer' if msg.get('role') == 'scammer' else 'Me'}: {msg.get('content', '')}"
-        for msg in session.messages[-5:]
-    ])
-    
+
+    conversation_history = "\n".join(
+        [
+            f"{'Scammer' if msg.get('role') == 'scammer' else 'Me'}: {msg.get('content', '')}"
+            for msg in session.messages[-5:]
+        ]
+    )
+
     prompt = f"""You are pretending to be a confused, naive Indian user who received a scam message. 
 Your persona style is: {session.persona_style.value}
 
@@ -100,22 +103,23 @@ Latest scammer message: {scammer_message}
 Generate a believable response as the confused victim:"""
 
     response = await client.aio.models.generate_content(
-        model="gemini-3-flash-preview",
-        contents=prompt
+        model="gemini-3-flash-preview", contents=prompt
     )
     return response.text.strip()
 
 
 async def _generate_template_response(session: SessionState) -> str:
     turn = session.turn_count
-    
+
     if turn <= 2:
-        responses = PERSONA_RESPONSES.get(session.persona_style, PERSONA_RESPONSES[PersonaStyle.CONFUSED])
+        responses = PERSONA_RESPONSES.get(
+            session.persona_style, PERSONA_RESPONSES[PersonaStyle.CONFUSED]
+        )
     elif turn <= 5:
         responses = CLARIFICATION_RESPONSES
     else:
         responses = DELAY_RESPONSES + PERSONA_RESPONSES.get(session.persona_style, [])
-    
+
     return random.choice(responses)
 
 
@@ -130,7 +134,9 @@ async def get_exit_response() -> str:
     return random.choice(exit_responses)
 
 
-async def select_persona_style(message_count: int, scam_intensity: float) -> PersonaStyle:
+async def select_persona_style(
+    message_count: int, scam_intensity: float
+) -> PersonaStyle:
     if message_count <= 3:
         return PersonaStyle.CONFUSED
     elif scam_intensity > 0.8:

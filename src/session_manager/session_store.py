@@ -1,12 +1,13 @@
-from abc import ABC, abstractmethod
-from typing import Optional, Dict
-from datetime import datetime, timezone
-import json
 import asyncio
-import redis.asyncio as redis
-from src.models import SessionState, ExtractedIntelligence, PersonaStyle
-from src.config import get_settings
+import json
+from abc import ABC, abstractmethod
+from datetime import datetime, timezone
+from typing import Dict, Optional
 
+import redis.asyncio as redis
+
+from src.config import get_settings
+from src.models import ExtractedIntelligence, PersonaStyle, SessionState
 
 settings = get_settings()
 
@@ -16,30 +17,30 @@ class SessionLockManager:
     _locks: Dict[str, asyncio.Lock] = {}
     _global_lock = asyncio.Lock()
     _semaphore: Optional[asyncio.Semaphore] = None
-    
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
-    
+
     @classmethod
     async def get_semaphore(cls) -> asyncio.Semaphore:
         if cls._semaphore is None:
             cls._semaphore = asyncio.Semaphore(settings.max_concurrent_sessions)
         return cls._semaphore
-    
+
     @classmethod
     async def get_lock(cls, session_id: str) -> asyncio.Lock:
         async with cls._global_lock:
             if session_id not in cls._locks:
                 cls._locks[session_id] = asyncio.Lock()
             return cls._locks[session_id]
-    
+
     @classmethod
     async def release_lock(cls, session_id: str) -> None:
         async with cls._global_lock:
             cls._locks.pop(session_id, None)
-    
+
     @classmethod
     async def cleanup_stale_locks(cls, active_sessions: set) -> int:
         async with cls._global_lock:
@@ -68,7 +69,7 @@ class BaseSessionStore(ABC):
 
     async def cleanup_expired(self) -> int:
         return 0
-    
+
     async def get_active_session_ids(self) -> set:
         return set()
 
@@ -117,11 +118,11 @@ class InMemorySessionStore(BaseSessionStore):
         for sid in expired:
             await SessionLockManager.release_lock(sid)
         return len(expired)
-    
+
     async def get_active_session_ids(self) -> set:
         async with self._lock:
             return set(self._store.keys())
-    
+
     async def get_session_count(self) -> int:
         return len(self._store)
 
@@ -133,7 +134,7 @@ class RedisSessionStore(BaseSessionStore):
             decode_responses=True,
             max_connections=50,
             socket_timeout=5.0,
-            socket_connect_timeout=5.0
+            socket_connect_timeout=5.0,
         )
         self._prefix = "scam_session:"
         self._ttl = settings.session_timeout_seconds
@@ -151,9 +152,7 @@ class RedisSessionStore(BaseSessionStore):
         state.last_updated = datetime.now(timezone.utc)
         try:
             await self._redis.setex(
-                f"{self._prefix}{session_id}",
-                self._ttl,
-                state.model_dump_json()
+                f"{self._prefix}{session_id}", self._ttl, state.model_dump_json()
             )
         except Exception:
             pass
@@ -171,7 +170,7 @@ class RedisSessionStore(BaseSessionStore):
             return await self._redis.exists(f"{self._prefix}{session_id}") > 0
         except Exception:
             return False
-    
+
     async def get_active_session_ids(self) -> set:
         try:
             keys = await self._redis.keys(f"{self._prefix}*")
@@ -199,7 +198,7 @@ async def get_or_create_session_store() -> BaseSessionStore:
 async def get_or_create_session(session_id: str) -> SessionState:
     semaphore = await SessionLockManager.get_semaphore()
     session_lock = await SessionLockManager.get_lock(session_id)
-    
+
     async with semaphore:
         async with session_lock:
             store = await get_or_create_session_store()
@@ -213,7 +212,7 @@ async def get_or_create_session(session_id: str) -> SessionState:
                     confidence_level=0.5,
                     scam_detected=False,
                     engagement_active=True,
-                    messages=[]
+                    messages=[],
                 )
                 await store.set(session_id, session)
             return session

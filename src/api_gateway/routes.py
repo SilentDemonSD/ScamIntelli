@@ -1,28 +1,31 @@
-from fastapi import APIRouter, HTTPException, Header, Depends, Request
-from typing import Optional
 from datetime import datetime, timezone
+from typing import Optional
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
+
+from src.agent_controller.strategy import (
+    get_engagement_summary,
+    process_message,
+    should_trigger_callback,
+)
+from src.callback_worker.guvi_callback import send_guvi_callback
+from src.config import get_settings
 from src.models import (
-    MessageRequest,
     AgentReply,
-    SessionResponse,
     EndSessionResponse,
     HealthResponse,
     HoneypotRequest,
-    HoneypotSimpleResponse
+    HoneypotSimpleResponse,
+    MessageRequest,
+    SessionResponse,
 )
-from src.session_manager.session_store import (
-    get_or_create_session,
-    update_session
-)
-from src.agent_controller.strategy import process_message, should_trigger_callback, get_engagement_summary
-from src.callback_worker.guvi_callback import send_guvi_callback
-from src.utils.validation import validate_session_id, validate_message, sanitize_input
 from src.security.tamper_proof import (
-    validate_incoming_request,
+    TamperProofMiddleware,
     create_tamper_proof_response,
-    TamperProofMiddleware
+    validate_incoming_request,
 )
-from src.config import get_settings
+from src.session_manager.session_store import get_or_create_session, update_session
+from src.utils.validation import sanitize_input, validate_message, validate_session_id
 
 settings = get_settings()
 router = APIRouter(prefix="/api/v1", tags=["honeypot"])
@@ -47,27 +50,29 @@ def _extract_client_info(request: Request) -> tuple:
 async def handle_message(
     request_body: MessageRequest,
     request: Request,
-    api_key: str = Depends(verify_api_key)
+    api_key: str = Depends(verify_api_key),
 ):
     if not validate_session_id(request_body.session_id):
         raise HTTPException(status_code=400, detail="Invalid session ID format")
     if not validate_message(request_body.message):
         raise HTTPException(status_code=400, detail="Invalid message format")
-    
+
     message = sanitize_input(request_body.message)
     ip, user_agent, headers = _extract_client_info(request)
     try:
-        validate_incoming_request(ip, user_agent, request_body.session_id, message, headers)
+        validate_incoming_request(
+            ip, user_agent, request_body.session_id, message, headers
+        )
     except Exception:
         pass
-    
+
     session = await get_or_create_session(request_body.session_id)
     session, reply = await process_message(session, message)
     await update_session(session)
-    
+
     if not session.engagement_active and await should_trigger_callback(session):
         await send_guvi_callback(session)
-    
+
     return reply
 
 
@@ -75,42 +80,53 @@ async def handle_message(
 async def honeypot_endpoint(
     request_body: HoneypotRequest,
     request: Request,
-    x_api_key: Optional[str] = Header(None, alias="x-api-key")
+    x_api_key: Optional[str] = Header(None, alias="x-api-key"),
 ):
     if not x_api_key or x_api_key != settings.api_key:
-        raise HTTPException(status_code=401 if not x_api_key else 403, detail="API key required" if not x_api_key else "Invalid API key")
-    
-    message_text = request_body.message.get("text", "") if isinstance(request_body.message, dict) else request_body.message.text
+        raise HTTPException(
+            status_code=401 if not x_api_key else 403,
+            detail="API key required" if not x_api_key else "Invalid API key",
+        )
+
+    message_text = (
+        request_body.message.get("text", "")
+        if isinstance(request_body.message, dict)
+        else request_body.message.text
+    )
     if not message_text:
         raise HTTPException(status_code=400, detail="Message text required")
-    
+
     ip, user_agent, headers = _extract_client_info(request)
     try:
-        validate_incoming_request(ip, user_agent, request_body.sessionId, message_text, headers)
+        validate_incoming_request(
+            ip, user_agent, request_body.sessionId, message_text, headers
+        )
     except Exception:
         pass
-    
+
     session = await get_or_create_session(request_body.sessionId)
     session, reply = await process_message(session, message_text)
     await update_session(session)
-    
+
     conversation_complete = not session.engagement_active or session.turn_count >= 10
     if conversation_complete and session.scam_detected:
         await send_guvi_callback(session)
-    
-    persona_type = getattr(session, 'persona_type', None)
+
+    persona_type = getattr(session, "persona_type", None)
     if persona_type is None:
         persona_str = "default"
-    elif hasattr(persona_type, 'value'):
+    elif hasattr(persona_type, "value"):
         persona_str = persona_type.value
     else:
         persona_str = str(persona_type)
-    
-    response_data, _ = create_tamper_proof_response({"status": "success", "reply": reply.reply}, persona_str)
-    
+
+    response_data, _ = create_tamper_proof_response(
+        {"status": "success", "reply": reply.reply}, persona_str
+    )
+
     return HoneypotSimpleResponse(
         status=response_data.get("status", "success"),
-        reply=response_data.get("reply", reply.reply)
+        reply=response_data.get("reply", reply.reply),
     )
 
 
@@ -118,15 +134,15 @@ async def honeypot_endpoint(
 async def get_session(session_id: str, api_key: str = Depends(verify_api_key)):
     if not validate_session_id(session_id):
         raise HTTPException(status_code=400, detail="Invalid session ID format")
-    
+
     session = await get_or_create_session(session_id)
-    
+
     return SessionResponse(
         session_id=session.session_id,
         scam_detected=session.scam_detected,
         engagement_active=session.engagement_active,
         turn_count=session.turn_count,
-        extracted_intelligence=session.extracted_intel
+        extracted_intelligence=session.extracted_intel,
     )
 
 
@@ -134,20 +150,23 @@ async def get_session(session_id: str, api_key: str = Depends(verify_api_key)):
 async def end_session(session_id: str, api_key: str = Depends(verify_api_key)):
     if not validate_session_id(session_id):
         raise HTTPException(status_code=400, detail="Invalid session ID format")
-    
+
     session = await get_or_create_session(session_id)
-    callback_sent = await send_guvi_callback(session) if session.scam_detected else False
-    
+    callback_sent = (
+        await send_guvi_callback(session) if session.scam_detected else False
+    )
+
     from src.session_manager.session_store import get_or_create_session_store
+
     store = await get_or_create_session_store()
     await store.delete(session_id)
-    
+
     return EndSessionResponse(
         status="success",
         session_id=session_id,
         callback_sent=callback_sent,
         total_messages=session.turn_count,
-        extracted_intelligence=session.extracted_intel
+        extracted_intelligence=session.extracted_intel,
     )
 
 

@@ -1,7 +1,8 @@
-from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional, Union, Any
-from enum import Enum
 from datetime import datetime, timezone
+from enum import Enum
+from typing import Any, List, Optional, Union
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class PersonaStyle(str, Enum):
@@ -16,31 +17,33 @@ class MessageRequest(BaseModel):
 
 
 class MessageContent(BaseModel):
-    model_config = ConfigDict(extra='ignore')
+    model_config = ConfigDict(extra="ignore")
     sender: str = Field(..., description="Sender: 'scammer' or 'user'")
     text: str = Field(..., description="Message content")
     timestamp: Optional[Union[int, str]] = Field(default=None)
 
 
 class ConversationMessage(BaseModel):
-    model_config = ConfigDict(extra='ignore')
+    model_config = ConfigDict(extra="ignore")
     sender: str = Field(...)
     text: str = Field(...)
     timestamp: Optional[Union[int, str]] = Field(default=None)
 
 
 class Metadata(BaseModel):
-    model_config = ConfigDict(extra='ignore')
+    model_config = ConfigDict(extra="ignore")
     channel: str = Field(default="SMS")
     language: str = Field(default="English")
     locale: str = Field(default="IN")
 
 
 class HoneypotRequest(BaseModel):
-    model_config = ConfigDict(extra='ignore')
+    model_config = ConfigDict(extra="ignore")
     sessionId: str = Field(...)
     message: Union[MessageContent, dict, Any] = Field(...)
-    conversationHistory: List[Union[ConversationMessage, dict]] = Field(default_factory=list)
+    conversationHistory: List[Union[ConversationMessage, dict]] = Field(
+        default_factory=list
+    )
     metadata: Optional[Union[Metadata, dict, Any]] = Field(default=None)
 
 
@@ -59,7 +62,9 @@ class HoneypotResponse(BaseModel):
     scamDetected: bool = Field(...)
     agentResponse: Optional[str] = Field(default=None)
     engagementMetrics: EngagementMetrics = Field(default_factory=EngagementMetrics)
-    extractedIntelligence: "GuviExtractedIntelligence" = Field(default_factory=lambda: GuviExtractedIntelligence())
+    extractedIntelligence: "GuviExtractedIntelligence" = Field(
+        default_factory=lambda: GuviExtractedIntelligence()
+    )
     agentNotes: Optional[str] = Field(default=None)
     sessionId: str = Field(...)
     conversationComplete: bool = Field(default=False)
@@ -91,12 +96,14 @@ class GuviExtractedIntelligence(BaseModel):
 
 class SessionState(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True, use_enum_values=True)
-    
+
     session_id: str
     persona_style: PersonaStyle = PersonaStyle.CONFUSED
     persona_type: Optional[str] = Field(default=None)
     scam_category: Optional[str] = Field(default=None)
-    extracted_intel: ExtractedIntelligence = Field(default_factory=ExtractedIntelligence)
+    extracted_intel: ExtractedIntelligence = Field(
+        default_factory=ExtractedIntelligence
+    )
     turn_count: int = 0
     confidence_level: float = 0.5
     scam_detected: bool = False

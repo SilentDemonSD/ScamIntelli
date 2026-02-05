@@ -1,9 +1,9 @@
+import random
+import re
 from contextlib import suppress
 from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
-import random
-import re
 
 from google import genai
 
@@ -78,7 +78,7 @@ PERSONA_PROFILES: Dict[PersonaType, PersonaProfile] = {
             "Main apne bete ko phone karta hun pehle.",
             "Mujhe bank jaana padega personally.",
             "Mera padosi bank mein kaam karta hai, usse puchh leta hun.",
-        )
+        ),
     ),
     PersonaType.TECH_NAIVE: PersonaProfile(
         persona_type=PersonaType.TECH_NAIVE,
@@ -104,7 +104,7 @@ PERSONA_PROFILES: Dict[PersonaType, PersonaProfile] = {
             "Mera ladka shaam ko aayega, woh kar dega.",
             "Main bank jaake seedha baat karunga.",
             "Yeh sab mujhse nahi hota, sorry.",
-        )
+        ),
     ),
     PersonaType.DESPERATE_JOBSEEKER: PersonaProfile(
         persona_type=PersonaType.DESPERATE_JOBSEEKER,
@@ -130,7 +130,7 @@ PERSONA_PROFILES: Dict[PersonaType, PersonaProfile] = {
             "Mere friend ko bhi scam hua tha aise hi.",
             "Placement cell se confirm kar leta hun.",
             "Papa bol rahe pehle verify karo company.",
-        )
+        ),
     ),
     PersonaType.GREEDY_INVESTOR: PersonaProfile(
         persona_type=PersonaType.GREEDY_INVESTOR,
@@ -156,7 +156,7 @@ PERSONA_PROFILES: Dict[PersonaType, PersonaProfile] = {
             "Mera CA bol raha fraud hai yeh.",
             "SEBI registered nahi hai yeh platform.",
             "Too good to be true lag raha hai.",
-        )
+        ),
     ),
     PersonaType.WORRIED_PARENT: PersonaProfile(
         persona_type=PersonaType.WORRIED_PARENT,
@@ -182,7 +182,7 @@ PERSONA_PROFILES: Dict[PersonaType, PersonaProfile] = {
             "Main seedha bank jaaunga complaint karne.",
             "Mere department mein cyber cell hai, unse puchh leta hun.",
             "Yeh fraud lag raha hai mujhe.",
-        )
+        ),
     ),
     PersonaType.RURAL_FARMER: PersonaProfile(
         persona_type=PersonaType.RURAL_FARMER,
@@ -208,7 +208,7 @@ PERSONA_PROFILES: Dict[PersonaType, PersonaProfile] = {
             "Pradhan ji se milta hun pehle.",
             "Bank branch jaake puchh leta hun.",
             "Baccha bol raha fraud hai, mat karo.",
-        )
+        ),
     ),
     PersonaType.YOUNG_STUDENT: PersonaProfile(
         persona_type=PersonaType.YOUNG_STUDENT,
@@ -234,7 +234,7 @@ PERSONA_PROFILES: Dict[PersonaType, PersonaProfile] = {
             "Arre yeh scam hai bro, bye.",
             "Twitter pe dekha tha similar scam.",
             "Cyber cell complaint kar dunga ruk.",
-        )
+        ),
     ),
     PersonaType.BUSY_PROFESSIONAL: PersonaProfile(
         persona_type=PersonaType.BUSY_PROFESSIONAL,
@@ -260,7 +260,7 @@ PERSONA_PROFILES: Dict[PersonaType, PersonaProfile] = {
             "I'll verify this with official channels.",
             "This seems suspicious, I'm ending this call.",
             "I'm reporting this to cyber crime portal.",
-        )
+        ),
     ),
     PersonaType.LONELY_SENIOR: PersonaProfile(
         persona_type=PersonaType.LONELY_SENIOR,
@@ -286,7 +286,7 @@ PERSONA_PROFILES: Dict[PersonaType, PersonaProfile] = {
             "Beti ne mana kiya hai phone pe kuch batane ko.",
             "Ghar wale aa gaye, baad mein baat karunga.",
             "Doctor ke paas jaana hai abhi.",
-        )
+        ),
     ),
     PersonaType.FIRST_TIME_SELLER: PersonaProfile(
         persona_type=PersonaType.FIRST_TIME_SELLER,
@@ -312,7 +312,7 @@ PERSONA_PROFILES: Dict[PersonaType, PersonaProfile] = {
             "Receive karne ke liye QR scan? Yeh toh fraud hai!",
             "Main seedha cash le lunga, no online.",
             "Friend ne bataya yeh scam hai.",
-        )
+        ),
     ),
     PersonaType.SCARED_VICTIM: PersonaProfile(
         persona_type=PersonaType.SCARED_VICTIM,
@@ -338,7 +338,7 @@ PERSONA_PROFILES: Dict[PersonaType, PersonaProfile] = {
             "Pehle lawyer se baat kar leta hun.",
             "Police station jaake seedha puchh leta hun.",
             "Yeh sab jhooth lag raha hai.",
-        )
+        ),
     ),
     PersonaType.TRUSTING_HOUSEWIFE: PersonaProfile(
         persona_type=PersonaType.TRUSTING_HOUSEWIFE,
@@ -364,28 +364,70 @@ PERSONA_PROFILES: Dict[PersonaType, PersonaProfile] = {
             "Pati mana kar rahe hain, sorry.",
             "Sasur ji bol rahe fraud hai yeh.",
             "Main seedha bank jaaungi, bye.",
-        )
-    )
+        ),
+    ),
 }
 
 
 SCAM_PERSONA_MAPPING: Dict[ScamCategory, List[PersonaType]] = {
-    ScamCategory.DIGITAL_ARREST: [PersonaType.ELDERLY_ANXIOUS, PersonaType.SCARED_VICTIM, PersonaType.WORRIED_PARENT],
-    ScamCategory.KYC_PHISHING: [PersonaType.TECH_NAIVE, PersonaType.TRUSTING_HOUSEWIFE, PersonaType.ELDERLY_ANXIOUS],
-    ScamCategory.INVESTMENT_FRAUD: [PersonaType.GREEDY_INVESTOR, PersonaType.DESPERATE_JOBSEEKER, PersonaType.RURAL_FARMER],
-    ScamCategory.JOB_SCAM: [PersonaType.DESPERATE_JOBSEEKER, PersonaType.YOUNG_STUDENT, PersonaType.RURAL_FARMER],
-    ScamCategory.LOTTERY_PRIZE: [PersonaType.ELDERLY_ANXIOUS, PersonaType.RURAL_FARMER, PersonaType.TECH_NAIVE],
-    ScamCategory.ROMANCE_SCAM: [PersonaType.LONELY_SENIOR, PersonaType.TRUSTING_HOUSEWIFE],
-    ScamCategory.TECH_SUPPORT: [PersonaType.ELDERLY_ANXIOUS, PersonaType.TECH_NAIVE, PersonaType.BUSY_PROFESSIONAL],
-    ScamCategory.CUSTOMS_PARCEL: [PersonaType.WORRIED_PARENT, PersonaType.SCARED_VICTIM, PersonaType.BUSY_PROFESSIONAL],
-    ScamCategory.LOAN_FRAUD: [PersonaType.DESPERATE_JOBSEEKER, PersonaType.RURAL_FARMER, PersonaType.YOUNG_STUDENT],
+    ScamCategory.DIGITAL_ARREST: [
+        PersonaType.ELDERLY_ANXIOUS,
+        PersonaType.SCARED_VICTIM,
+        PersonaType.WORRIED_PARENT,
+    ],
+    ScamCategory.KYC_PHISHING: [
+        PersonaType.TECH_NAIVE,
+        PersonaType.TRUSTING_HOUSEWIFE,
+        PersonaType.ELDERLY_ANXIOUS,
+    ],
+    ScamCategory.INVESTMENT_FRAUD: [
+        PersonaType.GREEDY_INVESTOR,
+        PersonaType.DESPERATE_JOBSEEKER,
+        PersonaType.RURAL_FARMER,
+    ],
+    ScamCategory.JOB_SCAM: [
+        PersonaType.DESPERATE_JOBSEEKER,
+        PersonaType.YOUNG_STUDENT,
+        PersonaType.RURAL_FARMER,
+    ],
+    ScamCategory.LOTTERY_PRIZE: [
+        PersonaType.ELDERLY_ANXIOUS,
+        PersonaType.RURAL_FARMER,
+        PersonaType.TECH_NAIVE,
+    ],
+    ScamCategory.ROMANCE_SCAM: [
+        PersonaType.LONELY_SENIOR,
+        PersonaType.TRUSTING_HOUSEWIFE,
+    ],
+    ScamCategory.TECH_SUPPORT: [
+        PersonaType.ELDERLY_ANXIOUS,
+        PersonaType.TECH_NAIVE,
+        PersonaType.BUSY_PROFESSIONAL,
+    ],
+    ScamCategory.CUSTOMS_PARCEL: [
+        PersonaType.WORRIED_PARENT,
+        PersonaType.SCARED_VICTIM,
+        PersonaType.BUSY_PROFESSIONAL,
+    ],
+    ScamCategory.LOAN_FRAUD: [
+        PersonaType.DESPERATE_JOBSEEKER,
+        PersonaType.RURAL_FARMER,
+        PersonaType.YOUNG_STUDENT,
+    ],
     ScamCategory.CRYPTO_SCAM: [PersonaType.GREEDY_INVESTOR, PersonaType.YOUNG_STUDENT],
-    ScamCategory.DEEPFAKE_IMPERSONATION: [PersonaType.BUSY_PROFESSIONAL, PersonaType.WORRIED_PARENT],
+    ScamCategory.DEEPFAKE_IMPERSONATION: [
+        PersonaType.BUSY_PROFESSIONAL,
+        PersonaType.WORRIED_PARENT,
+    ],
     ScamCategory.SIM_SWAP: [PersonaType.TECH_NAIVE, PersonaType.ELDERLY_ANXIOUS],
     ScamCategory.QR_CODE_SCAM: [PersonaType.FIRST_TIME_SELLER, PersonaType.TECH_NAIVE],
-    ScamCategory.REFUND_SCAM: [PersonaType.TRUSTING_HOUSEWIFE, PersonaType.TECH_NAIVE, PersonaType.ELDERLY_ANXIOUS],
+    ScamCategory.REFUND_SCAM: [
+        PersonaType.TRUSTING_HOUSEWIFE,
+        PersonaType.TECH_NAIVE,
+        PersonaType.ELDERLY_ANXIOUS,
+    ],
     ScamCategory.SEXTORTION: [PersonaType.SCARED_VICTIM, PersonaType.YOUNG_STUDENT],
-    ScamCategory.UNKNOWN: [PersonaType.TECH_NAIVE, PersonaType.ELDERLY_ANXIOUS]
+    ScamCategory.UNKNOWN: [PersonaType.TECH_NAIVE, PersonaType.ELDERLY_ANXIOUS],
 }
 
 
@@ -396,49 +438,155 @@ def _get_genai_client():
     return _genai_client
 
 
-HINDI_PATTERNS = frozenset({
-    'kya', 'hai', 'haan', 'ji', 'nahi', 'aap', 'mein', 'mere', 'mera', 'meri',
-    'kaise', 'kahan', 'kyun', 'kab', 'kaun', 'kitna', 'kal', 'aaj',
-    'paisa', 'rupay', 'lakh', 'crore', 'khata', 'paise', 'bhej', 'bhejo',
-    'karo', 'karna', 'karenge', 'karunga', 'karungi', 'batao', 'bolo',
-    'samajh', 'pata', 'malum', 'theek', 'accha', 'sahi', 'galat',
-    'aapka', 'aapki', 'tumhara', 'unka', 'iska', 'uska', 'hamara',
-    'ruko', 'chalo', 'jaldi', 'abhi', 'baad', 'pehle', 'phir',
-    'gaya', 'gayi', 'gaye', 'raha', 'rahi', 'rahe', 'hoga', 'hogi',
-    'liye', 'wala', 'wali', 'wale', 'bohot', 'bahut', 'zyada', 'kam',
-    'bhai', 'didi', 'uncle', 'aunty', 'beta', 'beti', 'sir',
-    'block', 'ho', 'kar', 'de', 'le', 'ja', 'aa', 'lo', 'do', 'ke'
-})
+HINDI_PATTERNS = frozenset(
+    {
+        "kya",
+        "hai",
+        "haan",
+        "ji",
+        "nahi",
+        "aap",
+        "mein",
+        "mere",
+        "mera",
+        "meri",
+        "kaise",
+        "kahan",
+        "kyun",
+        "kab",
+        "kaun",
+        "kitna",
+        "kal",
+        "aaj",
+        "paisa",
+        "rupay",
+        "lakh",
+        "crore",
+        "khata",
+        "paise",
+        "bhej",
+        "bhejo",
+        "karo",
+        "karna",
+        "karenge",
+        "karunga",
+        "karungi",
+        "batao",
+        "bolo",
+        "samajh",
+        "pata",
+        "malum",
+        "theek",
+        "accha",
+        "sahi",
+        "galat",
+        "aapka",
+        "aapki",
+        "tumhara",
+        "unka",
+        "iska",
+        "uska",
+        "hamara",
+        "ruko",
+        "chalo",
+        "jaldi",
+        "abhi",
+        "baad",
+        "pehle",
+        "phir",
+        "gaya",
+        "gayi",
+        "gaye",
+        "raha",
+        "rahi",
+        "rahe",
+        "hoga",
+        "hogi",
+        "liye",
+        "wala",
+        "wali",
+        "wale",
+        "bohot",
+        "bahut",
+        "zyada",
+        "kam",
+        "bhai",
+        "didi",
+        "uncle",
+        "aunty",
+        "beta",
+        "beti",
+        "sir",
+        "block",
+        "ho",
+        "kar",
+        "de",
+        "le",
+        "ja",
+        "aa",
+        "lo",
+        "do",
+        "ke",
+    }
+)
 
-FORMAL_ENGLISH_PATTERNS = frozenset({
-    'kindly', 'please', 'immediately', 'urgent', 'regarding',
-    'verification', 'compliance', 'procedure', 'suspended', 'terminate',
-    'department', 'authority', 'investigation', 'confirmation', 'suspend',
-    'legal', 'action', 'notice', 'violation', 'penalty', 'deadline',
-    'dear', 'respected', 'hereby', 'therefore', 'furthermore', 'moreover',
-    'pursuant', 'accordance', 'regulations', 'mandatory', 'failure'
-})
+FORMAL_ENGLISH_PATTERNS = frozenset(
+    {
+        "kindly",
+        "please",
+        "immediately",
+        "urgent",
+        "regarding",
+        "verification",
+        "compliance",
+        "procedure",
+        "suspended",
+        "terminate",
+        "department",
+        "authority",
+        "investigation",
+        "confirmation",
+        "suspend",
+        "legal",
+        "action",
+        "notice",
+        "violation",
+        "penalty",
+        "deadline",
+        "dear",
+        "respected",
+        "hereby",
+        "therefore",
+        "furthermore",
+        "moreover",
+        "pursuant",
+        "accordance",
+        "regulations",
+        "mandatory",
+        "failure",
+    }
+)
 
 
 def detect_scammer_language(message: str, history: List[dict] = None) -> LanguageStyle:
     text = message.lower()
-    words = set(re.findall(r'\b[a-zA-Z]+\b', text))
-    
+    words = set(re.findall(r"\b[a-zA-Z]+\b", text))
+
     hindi_count = len(words & HINDI_PATTERNS)
     formal_count = len(words & FORMAL_ENGLISH_PATTERNS)
-    
-    has_devanagari = bool(re.search(r'[\u0900-\u097F]', message))
-    
+
+    has_devanagari = bool(re.search(r"[\u0900-\u097F]", message))
+
     if has_devanagari:
         return LanguageStyle.PURE_HINDI
-    
+
     total_words = len(words)
     if total_words == 0:
         return LanguageStyle.HINGLISH_HEAVY_HINDI
-    
+
     hindi_ratio = hindi_count / total_words
     formal_ratio = formal_count / total_words
-    
+
     if hindi_ratio > 0.25:
         return LanguageStyle.HINGLISH_HEAVY_HINDI
     elif hindi_ratio > 0.1 and formal_ratio < 0.1:
@@ -451,10 +599,14 @@ def detect_scammer_language(message: str, history: List[dict] = None) -> Languag
         return LanguageStyle.HINGLISH_HEAVY_ENGLISH
 
 
-def get_language_instruction(lang_style: LanguageStyle, persona_type: PersonaType) -> str:
-    profile = PERSONA_PROFILES.get(persona_type, PERSONA_PROFILES[PersonaType.TECH_NAIVE])
+def get_language_instruction(
+    lang_style: LanguageStyle, persona_type: PersonaType
+) -> str:
+    profile = PERSONA_PROFILES.get(
+        persona_type, PERSONA_PROFILES[PersonaType.TECH_NAIVE]
+    )
     tech_level = profile.tech_literacy
-    
+
     if lang_style == LanguageStyle.FORMAL_ENGLISH:
         if tech_level == "high":
             return """LANGUAGE INSTRUCTION: The scammer is using formal English. 
@@ -471,12 +623,12 @@ Grammar mistakes are natural."""
 Respond primarily in Hindi with very basic English words. Show you don't understand well.
 Example: "Sir, English mein samajh nahi aata. Hindi mein bolo please."
 Be hesitant and confused with English terms."""
-    
+
     elif lang_style == LanguageStyle.PURE_HINDI:
         return """LANGUAGE INSTRUCTION: The scammer is speaking Hindi.
 Respond naturally in Hindi/Hinglish matching the persona's regional style.
 Use colloquial Hindi expressions and filler words."""
-    
+
     else:
         return """LANGUAGE INSTRUCTION: The scammer is using Hinglish (mixed Hindi-English).
 Match their style - respond in natural Hinglish.
@@ -510,7 +662,7 @@ HINGLISH_RESPONSES_BY_CONTEXT = {
         "Abhi busy hun thoda, 5 minute mein call back karta hun.",
         "Net slow chal raha hai, reconnect karna padega.",
         "Hold on, koi door pe hai. Abhi aata hun.",
-    ]
+    ],
 }
 
 
@@ -532,180 +684,234 @@ def _ensure_scam_category(scam_category) -> ScamCategory:
     return ScamCategory.UNKNOWN
 
 
-FORBIDDEN_PATTERNS = frozenset({
-    'scam', 'fraud', 'fake', 'cheat', 'dhoka', 'thug', 'loot', 'honeypot',
-    'trap', 'expose', 'report you', 'police complaint', 'cyber crime',
-    'i know this is', 'nice try', 'you are a scammer', 'scammer',
-    'as an ai', 'i am an ai', 'language model', 'artificial intelligence',
-    'i cannot', 'i\'m unable to', 'i don\'t have feelings',
-    'i was designed', 'my programming', 'as a chatbot',
-    'certainly', 'absolutely', 'i understand your concern',
-    'i apologize for any inconvenience', 'how may i assist you today',
-    'is there anything else i can help you with',
-    'verification process', 'authentication required', 'comply with regulations'
-})
+FORBIDDEN_PATTERNS = frozenset(
+    {
+        "scam",
+        "fraud",
+        "fake",
+        "cheat",
+        "dhoka",
+        "thug",
+        "loot",
+        "honeypot",
+        "trap",
+        "expose",
+        "report you",
+        "police complaint",
+        "cyber crime",
+        "i know this is",
+        "nice try",
+        "you are a scammer",
+        "scammer",
+        "as an ai",
+        "i am an ai",
+        "language model",
+        "artificial intelligence",
+        "i cannot",
+        "i'm unable to",
+        "i don't have feelings",
+        "i was designed",
+        "my programming",
+        "as a chatbot",
+        "certainly",
+        "absolutely",
+        "i understand your concern",
+        "i apologize for any inconvenience",
+        "how may i assist you today",
+        "is there anything else i can help you with",
+        "verification process",
+        "authentication required",
+        "comply with regulations",
+    }
+)
 
 SUSPICIOUS_PHRASE_PATTERNS = [
-    r'\bi\s+am\s+(?:an?\s+)?(?:ai|bot|assistant|program)\b',
-    r'\b(?:scam|fraud|fake|cheat)\b',
-    r'\b(?:expose|report|trap|honeypot)\b',
-    r'\bnice\s+try\b',
-    r'\bi\s+know\s+(?:this|you|what)\s+(?:is|are)\b',
-    r'\bcyber\s*(?:crime|cell|police)\b'
+    r"\bi\s+am\s+(?:an?\s+)?(?:ai|bot|assistant|program)\b",
+    r"\b(?:scam|fraud|fake|cheat)\b",
+    r"\b(?:expose|report|trap|honeypot)\b",
+    r"\bnice\s+try\b",
+    r"\bi\s+know\s+(?:this|you|what)\s+(?:is|are)\b",
+    r"\bcyber\s*(?:crime|cell|police)\b",
 ]
 
 
 class ResponseSelfCorrector:
     REPLACEMENT_RESPONSES = {
-        'confused': [
+        "confused": [
             "Kya? Samajh nahi aaya...",
             "Haan? Aap kya bol rahe ho?",
             "Ek baar phir batao please?",
-            "Sorry, dhyan nahi tha. Kya bola?"
+            "Sorry, dhyan nahi tha. Kya bola?",
         ],
-        'stall': [
+        "stall": [
             "Ek minute ruko, koi aaya hai door pe.",
             "Abhi busy hun thoda, wait karo.",
             "Phone pe network issue hai, sun nahi paya.",
-            "Ruko ruko, kuch check karna hai."
+            "Ruko ruko, kuch check karna hai.",
         ],
-        'compliant': [
+        "compliant": [
             "Ji haan, main kar raha hun.",
             "Okay okay, batao kya karna hai.",
             "Theek hai, aage bolo.",
-            "Haan ji, main sun raha hun."
-        ]
+            "Haan ji, main sun raha hun.",
+        ],
     }
-    
+
     @classmethod
-    def validate_response(cls, response: str, persona_type: PersonaType) -> Tuple[bool, List[str]]:
+    def validate_response(
+        cls, response: str, persona_type: PersonaType
+    ) -> Tuple[bool, List[str]]:
         response_lower = response.lower()
-        
-        issues = [f"forbidden_word:{p}" for p in FORBIDDEN_PATTERNS if p in response_lower]
+
+        issues = [
+            f"forbidden_word:{p}" for p in FORBIDDEN_PATTERNS if p in response_lower
+        ]
         issues.extend(
-            f"suspicious_pattern:{p[:20]}" 
-            for p in SUSPICIOUS_PHRASE_PATTERNS 
+            f"suspicious_pattern:{p[:20]}"
+            for p in SUSPICIOUS_PHRASE_PATTERNS
             if re.search(p, response_lower, re.IGNORECASE)
         )
-        
+
         if len(response) > 200:
             issues.append("too_long")
-        
-        if len(re.findall(r'[.!?]+', response)) > 3:
+
+        if len(re.findall(r"[.!?]+", response)) > 3:
             issues.append("too_many_sentences")
-        
-        profile = PERSONA_PROFILES.get(persona_type, PERSONA_PROFILES[PersonaType.TECH_NAIVE])
-        if profile.tech_literacy in ('very_low', 'low'):
-            formal_words = {'verification', 'authentication', 'procedure', 'compliance', 'furthermore'}
+
+        profile = PERSONA_PROFILES.get(
+            persona_type, PERSONA_PROFILES[PersonaType.TECH_NAIVE]
+        )
+        if profile.tech_literacy in ("very_low", "low"):
+            formal_words = {
+                "verification",
+                "authentication",
+                "procedure",
+                "compliance",
+                "furthermore",
+            }
             if any(word in response_lower for word in formal_words):
                 issues.append("too_formal_for_persona")
-        
+
         return not issues, issues
-    
+
     @classmethod
     def correct_response(
-        cls, 
-        response: str, 
+        cls,
+        response: str,
         persona_type: PersonaType,
         scam_category: ScamCategory,
-        turn_count: int
+        turn_count: int,
     ) -> str:
         is_valid, issues = cls.validate_response(response, persona_type)
-        
+
         if is_valid:
             return response
-        
-        if any('forbidden' in issue or 'suspicious' in issue for issue in issues):
+
+        if any("forbidden" in issue or "suspicious" in issue for issue in issues):
             return cls._get_safe_replacement(persona_type, turn_count)
-        
-        if 'too_long' in issues or 'too_many_sentences' in issues:
+
+        if "too_long" in issues or "too_many_sentences" in issues:
             return cls._truncate_response(response)
-        
-        if 'too_formal_for_persona' in issues:
+
+        if "too_formal_for_persona" in issues:
             return cls._simplify_response(response, persona_type)
-        
+
         return response
-    
+
     @classmethod
     def _get_safe_replacement(cls, persona_type: PersonaType, turn_count: int) -> str:
-        profile = PERSONA_PROFILES.get(persona_type, PERSONA_PROFILES[PersonaType.TECH_NAIVE])
+        profile = PERSONA_PROFILES.get(
+            persona_type, PERSONA_PROFILES[PersonaType.TECH_NAIVE]
+        )
         if turn_count <= 2:
             return random.choice(profile.typical_responses)
         return random.choice(
-            profile.typical_responses + profile.delay_phrases if turn_count <= 5 
-            else cls.REPLACEMENT_RESPONSES['stall']
+            profile.typical_responses + profile.delay_phrases
+            if turn_count <= 5
+            else cls.REPLACEMENT_RESPONSES["stall"]
         )
-    
+
     @classmethod
     def _truncate_response(cls, response: str) -> str:
-        sentences = re.split(r'(?<=[.!?])\s+', response)
+        sentences = re.split(r"(?<=[.!?])\s+", response)
         if len(sentences) > 2:
-            return ' '.join(sentences[:2])
+            return " ".join(sentences[:2])
         if len(response) > 150:
-            return response[:100].rsplit(' ', 1)[0] + '...'
+            return response[:100].rsplit(" ", 1)[0] + "..."
         return response
-    
+
     @classmethod
     def _simplify_response(cls, response: str, persona_type: PersonaType) -> str:
         simplifications = {
-            'verification': 'check', 'authentication': 'confirm', 'procedure': 'kaam',
-            'compliance': 'karna padega', 'documentation': 'papers', 'transaction': 'payment',
-            'subsequently': 'phir', 'furthermore': 'aur', 'immediately': 'abhi',
-            'regarding': 'ke baare mein'
+            "verification": "check",
+            "authentication": "confirm",
+            "procedure": "kaam",
+            "compliance": "karna padega",
+            "documentation": "papers",
+            "transaction": "payment",
+            "subsequently": "phir",
+            "furthermore": "aur",
+            "immediately": "abhi",
+            "regarding": "ke baare mein",
         }
         result = response
         for formal, simple in simplifications.items():
             result = re.sub(formal, simple, result, flags=re.IGNORECASE)
         return result
-    
+
     @classmethod
     def check_consistency(
-        cls, 
-        new_response: str, 
+        cls,
+        new_response: str,
         conversation_history: List[dict],
-        persona_type: PersonaType
+        persona_type: PersonaType,
     ) -> Tuple[bool, Optional[str]]:
         if not conversation_history:
             return True, None
-        
+
         prev_agent_msgs = [
-            m.get('content', '').lower() 
-            for m in conversation_history 
-            if m.get('role') == 'agent'
+            m.get("content", "").lower()
+            for m in conversation_history
+            if m.get("role") == "agent"
         ][-3:]
-        
+
         new_lower = new_response.lower()
-        availability_phrases = {'abhi nahi', 'busy hun', 'baad mein'}
-        immediate_phrases = {'abhi kar raha', 'ready hun', 'kar diya'}
-        
+        availability_phrases = {"abhi nahi", "busy hun", "baad mein"}
+        immediate_phrases = {"abhi kar raha", "ready hun", "kar diya"}
+
         availability_stated = any(
             any(phrase in msg for phrase in availability_phrases)
             for msg in prev_agent_msgs
         )
-        immediate_availability = any(phrase in new_lower for phrase in immediate_phrases)
-        
+        immediate_availability = any(
+            phrase in new_lower for phrase in immediate_phrases
+        )
+
         if availability_stated and immediate_availability:
             return False, "availability_contradiction"
-        
+
         def hindi_word_count(text: str) -> int:
             return len([w for w in text.split() if w in HINDI_PATTERNS])
-        
+
         prev_hindi_heavy = any(
             hindi_word_count(msg) > len(msg.split()) * 0.3
-            for msg in prev_agent_msgs if msg
+            for msg in prev_agent_msgs
+            if msg
         )
         new_words = new_lower.split()
         new_pure_english = hindi_word_count(new_lower) == 0
-        
+
         if prev_hindi_heavy and new_pure_english and len(new_words) > 5:
             return False, "language_style_shift"
-        
+
         return True, None
 
 
 def select_persona_for_scam(scam_category, turn_count: int = 0) -> PersonaType:
     scam_category = _ensure_scam_category(scam_category)
-    candidates = SCAM_PERSONA_MAPPING.get(scam_category, SCAM_PERSONA_MAPPING[ScamCategory.UNKNOWN])
+    candidates = SCAM_PERSONA_MAPPING.get(
+        scam_category, SCAM_PERSONA_MAPPING[ScamCategory.UNKNOWN]
+    )
     return candidates[0] if turn_count <= 2 else random.choice(candidates)
 
 
@@ -720,33 +926,38 @@ async def generate_persona_response(
     scammer_message: str,
     conversation_history: List[dict],
     turn_count: int,
-    context_hint: str = ""
+    context_hint: str = "",
 ) -> str:
     persona_type = _ensure_persona_type(persona_type)
     scam_category = _ensure_scam_category(scam_category)
     scammer_lang = detect_scammer_language(scammer_message, conversation_history)
-    
+
     response = None
     if settings.gemini_api_key:
         with suppress(Exception):
             response = await _generate_ai_persona_response(
-                persona_type, scam_category, scammer_message, 
-                conversation_history, turn_count, scammer_lang, context_hint
+                persona_type,
+                scam_category,
+                scammer_message,
+                conversation_history,
+                turn_count,
+                scammer_lang,
+                context_hint,
             )
-    
+
     if response is None:
         response = _generate_template_response(persona_type, turn_count, scammer_lang)
-    
+
     response = ResponseSelfCorrector.correct_response(
         response, persona_type, scam_category, turn_count
     )
-    
+
     is_consistent, _ = ResponseSelfCorrector.check_consistency(
         response, conversation_history, persona_type
     )
     if not is_consistent:
         response = ResponseSelfCorrector._get_safe_replacement(persona_type, turn_count)
-    
+
     return response
 
 
@@ -757,7 +968,7 @@ async def _generate_ai_persona_response(
     conversation_history: List[dict],
     turn_count: int,
     scammer_lang: LanguageStyle = LanguageStyle.HINGLISH_HEAVY_ENGLISH,
-    context_hint: str = ""
+    context_hint: str = "",
 ) -> str:
     client = _get_genai_client()
     if client is None:
@@ -765,12 +976,14 @@ async def _generate_ai_persona_response(
 
     profile = get_persona_profile(persona_type)
     lang_instruction = get_language_instruction(scammer_lang, persona_type)
-    
-    history_text = "\n".join([
-        f"{'Scammer' if m.get('role') in ('user', 'scammer') else 'Me'}: {m.get('content', '')}"
-        for m in conversation_history[-6:]
-    ])
-    
+
+    history_text = "\n".join(
+        [
+            f"{'Scammer' if m.get('role') in ('user', 'scammer') else 'Me'}: {m.get('content', '')}"
+            for m in conversation_history[-6:]
+        ]
+    )
+
     context_section = f"\nCONTEXT HINT: {context_hint}\n" if context_hint else ""
 
     prompt = f"""You are roleplaying as a potential scam victim in India to engage and waste a scammer's time while gathering intelligence.
@@ -779,7 +992,7 @@ PERSONA DETAILS:
 - Type: {profile.occupation} ({profile.age_range[0]}-{profile.age_range[1]} years old)
 - Tech literacy: {profile.tech_literacy}
 - Base language style: {profile.language_style}
-- Emotional triggers: {', '.join(profile.emotional_triggers)}
+- Emotional triggers: {", ".join(profile.emotional_triggers)}
 
 SCAM TYPE DETECTED: {scam_category.value}
 
@@ -807,10 +1020,9 @@ TURN NUMBER: {turn_count}
 Generate ONE short, realistic response as this persona. Just the response text, nothing else:"""
 
     response = await client.aio.models.generate_content(
-        model="gemini-3-flash-preview",
-        contents=prompt
+        model="gemini-3-flash-preview", contents=prompt
     )
-    
+
     text = response.text.strip()
     for quote in ('"', "'"):
         if text.startswith(quote) and text.endswith(quote):
@@ -819,23 +1031,26 @@ Generate ONE short, realistic response as this persona. Just the response text, 
 
 
 def _generate_template_response(
-    persona_type: PersonaType, 
+    persona_type: PersonaType,
     turn_count: int,
-    scammer_lang: LanguageStyle = LanguageStyle.HINGLISH_HEAVY_ENGLISH
+    scammer_lang: LanguageStyle = LanguageStyle.HINGLISH_HEAVY_ENGLISH,
 ) -> str:
     profile = get_persona_profile(persona_type)
-    
+
     if scammer_lang == LanguageStyle.FORMAL_ENGLISH:
         if profile.tech_literacy in ("very_low", "low"):
             context = "formal_english_confusion"
-        elif any(t in profile.emotional_triggers for t in ("fear", "fear_of_police", "scared")):
+        elif any(
+            t in profile.emotional_triggers
+            for t in ("fear", "fear_of_police", "scared")
+        ):
             context = "formal_english_fear"
         else:
             context = "formal_english_compliance"
-        
+
         if context in HINGLISH_RESPONSES_BY_CONTEXT:
             return random.choice(HINGLISH_RESPONSES_BY_CONTEXT[context])
-    
+
     if turn_count <= 2:
         return random.choice(profile.typical_responses)
     return random.choice(profile.typical_responses + profile.delay_phrases)
@@ -848,16 +1063,14 @@ def get_exit_response(persona_type) -> str:
 
 
 async def adapt_response_to_context(
-    base_response: str,
-    scammer_message: str,
-    scam_category
+    base_response: str, scammer_message: str, scam_category
 ) -> str:
     scam_category = _ensure_scam_category(scam_category)
     scammer_lower = scammer_message.lower()
     scammer_lang = detect_scammer_language(scammer_message)
-    
+
     is_formal = scammer_lang == LanguageStyle.FORMAL_ENGLISH
-    
+
     if any(kw in scammer_lower for kw in ["otp", "pin", "password", "cvv"]):
         if is_formal:
             delays = [
@@ -871,34 +1084,37 @@ async def adapt_response_to_context(
                 "Ek minute, dhundh raha hun...",
                 "Konsa OTP? Bahut saare messages aaye hain.",
                 "Password yaad nahi aa raha, ruko.",
-                "Phone mein bahut apps hain, konse wala?"
+                "Phone mein bahut apps hain, konse wala?",
             ]
         return random.choice(delays)
-    
+
     if any(kw in scammer_lower for kw in ["upi", "transfer", "send", "pay", "amount"]):
         if is_formal:
             stalls = [
                 "Sir, kitna amount transfer karna hai exactly?",
                 "Okay sir, but what is your UPI ID?",
                 "Let me check my account balance first sir.",
-                "Sir, aaj ka limit cross ho gaya. Tomorrow okay?"
+                "Sir, aaj ka limit cross ho gaya. Tomorrow okay?",
             ]
         else:
             stalls = [
                 "Kitna bhejne ka hai exactly?",
                 "UPI ID kya hai aapka?",
                 "Account mein balance check karna padega.",
-                "Limit cross ho gayi hai aaj ki, kal chalega?"
+                "Limit cross ho gayi hai aaj ki, kal chalega?",
             ]
         return random.choice(stalls)
-    
-    if any(kw in scammer_lower for kw in ["arrest", "police", "legal", "court", "case", "warrant"]):
+
+    if any(
+        kw in scammer_lower
+        for kw in ["arrest", "police", "legal", "court", "case", "warrant"]
+    ):
         fear_responses = [
             "Sir please, mujhe bahut dar lag raha hai. Main kya karun?",
             "Oh god, arrest? Meri family ko pata chalega kya?",
             "Sir main innocent hun, please help me!",
-            "Kya jail hogi? Please sir, kuch karo!"
+            "Kya jail hogi? Please sir, kuch karo!",
         ]
         return random.choice(fear_responses)
-    
+
     return base_response

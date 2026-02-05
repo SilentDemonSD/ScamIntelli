@@ -1,13 +1,11 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=False,
-        extra="ignore"
+        env_file=".env", env_file_encoding="utf-8", case_sensitive=False, extra="ignore"
     )
 
     api_key: str = "default_api_key"
@@ -25,7 +23,7 @@ class Settings(BaseSettings):
     max_concurrent_sessions: int = 1000
     rate_limit_per_minute: int = 60
     debug_mode: bool = False
-    
+
     @property
     def is_production(self) -> bool:
         return not self.debug_mode and self.enable_tamper_protection
