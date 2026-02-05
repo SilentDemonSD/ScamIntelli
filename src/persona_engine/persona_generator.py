@@ -100,7 +100,7 @@ Latest scammer message: {scammer_message}
 Generate a believable response as the confused victim:"""
 
     response = await client.aio.models.generate_content(
-        model="gemini-2.0-flash",
+        model="gemini-3-flash-preview",
         contents=prompt
     )
     return response.text.strip()

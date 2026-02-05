@@ -1,4 +1,4 @@
-from typing import Tuple, Optional, Union
+from typing import Tuple, Optional, Union, List, Dict
 from src.models import SessionState, AgentReply, PersonaStyle, ExtractedIntelligence
 from src.scam_detector.classifier import detect_scam
 from src.scam_detector.scam_types import ScamCategory, detect_scam_category, get_scam_profile
@@ -6,13 +6,110 @@ from src.intelligence_extractor.extractor import extract_all_intelligence, has_s
 from src.persona_engine.personas import (
     PersonaType, select_persona_for_scam, generate_persona_response,
     get_exit_response, adapt_response_to_context, get_persona_profile,
-    _ensure_persona_type, _ensure_scam_category
+    _ensure_persona_type, _ensure_scam_category, detect_scammer_language, LanguageStyle
 )
 from src.security.tamper_proof import ResponseObfuscator
 from src.session_manager.session_store import update_session
 from src.config import get_settings
 
 settings = get_settings()
+
+
+class ConversationContextTracker:
+    """Tracks conversation state and context for more coherent multi-turn responses"""
+    
+    @staticmethod
+    def analyze_conversation_flow(messages: List[dict]) -> Dict[str, any]:
+        """Analyze conversation to extract key context for response generation"""
+        context = {
+            'scammer_urgency': 0,
+            'agent_compliance_shown': 0,
+            'info_requested_count': 0,
+            'threats_made': 0,
+            'emotional_state': 'neutral',
+            'pending_actions': [],
+            'scammer_language_trend': LanguageStyle.HINGLISH_HEAVY_ENGLISH,
+            'last_scammer_topics': []
+        }
+        
+        if not messages:
+            return context
+        
+        urgency_keywords = {'immediately', 'urgent', 'now', 'quickly', 'fast', 'abhi', 'jaldi', 'turant'}
+        threat_keywords = {'arrest', 'police', 'jail', 'court', 'case', 'block', 'freeze', 'legal', 'FIR'}
+        info_keywords = {'otp', 'pin', 'password', 'cvv', 'account', 'upi', 'aadhaar', 'pan'}
+        compliance_keywords = {'okay', 'theek', 'haan', 'yes', 'alright', 'kar raha', 'sending'}
+        
+        for msg in messages[-8:]:  # Analyze last 8 messages for context
+            content = msg.get('content', '').lower()
+            role = msg.get('role', '')
+            
+            if role in ('user', 'scammer'):
+                # Track scammer's behavior
+                context['scammer_urgency'] += sum(1 for kw in urgency_keywords if kw in content)
+                context['threats_made'] += sum(1 for kw in threat_keywords if kw in content)
+                context['info_requested_count'] += sum(1 for kw in info_keywords if kw in content)
+                
+                # Track topics scammer is pushing
+                if any(kw in content for kw in ['otp', 'pin', 'password']):
+                    context['last_scammer_topics'].append('credentials')
+                if any(kw in content for kw in ['pay', 'transfer', 'send', 'upi']):
+                    context['last_scammer_topics'].append('payment')
+                if any(kw in content for kw in ['arrest', 'police', 'legal']):
+                    context['last_scammer_topics'].append('threat')
+                    
+            elif role == 'agent':
+                # Track agent's shown compliance
+                context['agent_compliance_shown'] += sum(1 for kw in compliance_keywords if kw in content)
+                
+                # Track pending actions mentioned by agent
+                if any(phrase in content for phrase in ['dhundh raha', 'check kar', 'looking', 'finding']):
+                    context['pending_actions'].append('searching')
+                if any(phrase in content for phrase in ['bank ja', 'atm', 'withdraw']):
+                    context['pending_actions'].append('going_to_bank')
+        
+        # Determine emotional state based on threats
+        if context['threats_made'] > 2:
+            context['emotional_state'] = 'fearful'
+        elif context['scammer_urgency'] > 3:
+            context['emotional_state'] = 'anxious'
+        elif context['agent_compliance_shown'] > 2:
+            context['emotional_state'] = 'compliant'
+        
+        # Track scammer language trend
+        scammer_msgs = [m.get('content', '') for m in messages[-4:] if m.get('role') in ('user', 'scammer')]
+        if scammer_msgs:
+            combined_scammer_text = ' '.join(scammer_msgs)
+            context['scammer_language_trend'] = detect_scammer_language(combined_scammer_text)
+        
+        return context
+    
+    @staticmethod
+    def get_contextual_response_hint(context: Dict[str, any], turn_count: int) -> str:
+        """Generate a hint for AI to maintain conversation coherence"""
+        hints = []
+        
+        if context['emotional_state'] == 'fearful':
+            hints.append("Show genuine fear, ask for reassurance")
+        elif context['emotional_state'] == 'anxious':
+            hints.append("Show nervousness, mention family concerns")
+        
+        if 'credentials' in context['last_scammer_topics']:
+            hints.append("Stall on OTP/credentials - pretend to search")
+        if 'payment' in context['last_scammer_topics']:
+            hints.append("Ask about amount, mention low balance")
+        if 'threat' in context['last_scammer_topics']:
+            hints.append("Plead innocence, show fear of consequences")
+        
+        if 'searching' in context['pending_actions']:
+            hints.append("Continue pretending to search/find something")
+        if 'going_to_bank' in context['pending_actions']:
+            hints.append("Mention you need to go to bank/ATM")
+        
+        if turn_count > 5 and context['agent_compliance_shown'] < 2:
+            hints.append("Show slightly more willingness to cooperate")
+        
+        return "; ".join(hints) if hints else "Respond naturally as the persona"
 
 
 class EngagementStrategy:
@@ -159,8 +256,15 @@ async def process_message(session: SessionState, message: str) -> Tuple[SessionS
         persona_type = _ensure_persona_type(session.persona_type)
         scam_cat = _ensure_scam_category(session.scam_category)
         
+        # Analyze conversation context for better multi-turn coherence
+        conv_context = ConversationContextTracker.analyze_conversation_flow(session.messages)
+        context_hint = ConversationContextTracker.get_contextual_response_hint(
+            conv_context, session.turn_count
+        )
+        
         reply_text = await generate_persona_response(
-            persona_type, scam_cat, message, session.messages, session.turn_count
+            persona_type, scam_cat, message, session.messages, session.turn_count,
+            context_hint=context_hint
         )
         
         reply_text = await adapt_response_to_context(reply_text, message, scam_cat)

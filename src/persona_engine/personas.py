@@ -533,6 +533,201 @@ def _ensure_scam_category(scam_category) -> ScamCategory:
     return ScamCategory.UNKNOWN
 
 
+FORBIDDEN_PATTERNS = frozenset({
+    # Scam-revealing words
+    'scam', 'fraud', 'fake', 'cheat', 'dhoka', 'thug', 'loot', 'honeypot',
+    'trap', 'expose', 'report you', 'police complaint', 'cyber crime',
+    'i know this is', 'nice try', 'you are a scammer', 'scammer',
+    # AI-sounding phrases
+    'as an ai', 'i am an ai', 'language model', 'artificial intelligence',
+    'i cannot', 'i\'m unable to', 'i don\'t have feelings',
+    'i was designed', 'my programming', 'as a chatbot',
+    # Too formal/robotic
+    'certainly', 'absolutely', 'i understand your concern',
+    'i apologize for any inconvenience', 'how may i assist you today',
+    'is there anything else i can help you with',
+    # English phrases that break persona for low-tech users
+    'verification process', 'authentication required', 'comply with regulations'
+})
+
+SUSPICIOUS_PHRASE_PATTERNS = [
+    r'\bi\s+am\s+(?:an?\s+)?(?:ai|bot|assistant|program)\b',
+    r'\b(?:scam|fraud|fake|cheat)\b',
+    r'\b(?:expose|report|trap|honeypot)\b',
+    r'\bnice\s+try\b',
+    r'\bi\s+know\s+(?:this|you|what)\s+(?:is|are)\b',
+    r'\bcyber\s*(?:crime|cell|police)\b'
+]
+
+
+class ResponseSelfCorrector:
+    REPLACEMENT_RESPONSES = {
+        'confused': [
+            "Kya? Samajh nahi aaya...",
+            "Haan? Aap kya bol rahe ho?",
+            "Ek baar phir batao please?",
+            "Sorry, dhyan nahi tha. Kya bola?"
+        ],
+        'stall': [
+            "Ek minute ruko, koi aaya hai door pe.",
+            "Abhi busy hun thoda, wait karo.",
+            "Phone pe network issue hai, sun nahi paya.",
+            "Ruko ruko, kuch check karna hai."
+        ],
+        'compliant': [
+            "Ji haan, main kar raha hun.",
+            "Okay okay, batao kya karna hai.",
+            "Theek hai, aage bolo.",
+            "Haan ji, main sun raha hun."
+        ]
+    }
+    
+    @classmethod
+    def validate_response(cls, response: str, persona_type: PersonaType) -> Tuple[bool, List[str]]:
+        issues = []
+        response_lower = response.lower()
+        
+        for pattern in FORBIDDEN_PATTERNS:
+            if pattern in response_lower:
+                issues.append(f"forbidden_word:{pattern}")
+        
+        for pattern in SUSPICIOUS_PHRASE_PATTERNS:
+            if re.search(pattern, response_lower, re.IGNORECASE):
+                issues.append(f"suspicious_pattern:{pattern[:20]}")
+        
+        if len(response) > 200:
+            issues.append("too_long")
+        
+        sentence_count = len(re.findall(r'[.!?]+', response))
+        if sentence_count > 3:
+            issues.append("too_many_sentences")
+        
+        profile = PERSONA_PROFILES.get(persona_type, PERSONA_PROFILES[PersonaType.TECH_NAIVE])
+        if profile.tech_literacy in ('very_low', 'low'):
+            formal_words = ['verification', 'authentication', 'procedure', 'compliance', 'furthermore']
+            if any(word in response_lower for word in formal_words):
+                issues.append("too_formal_for_persona")
+        
+        return len(issues) == 0, issues
+    
+    @classmethod
+    def correct_response(
+        cls, 
+        response: str, 
+        persona_type: PersonaType,
+        scam_category: ScamCategory,
+        turn_count: int
+    ) -> str:
+        """
+        Self-corrects a response if it fails validation.
+        Returns corrected response.
+        """
+        is_valid, issues = cls.validate_response(response, persona_type)
+        
+        if is_valid:
+            return response
+        
+        if any('forbidden' in issue or 'suspicious' in issue for issue in issues):
+            return cls._get_safe_replacement(persona_type, turn_count)
+        
+        if 'too_long' in issues or 'too_many_sentences' in issues:
+            return cls._truncate_response(response)
+        
+        if 'too_formal_for_persona' in issues:
+            return cls._simplify_response(response, persona_type)
+        
+        return response
+    
+    @classmethod
+    def _get_safe_replacement(cls, persona_type: PersonaType, turn_count: int) -> str:
+        profile = PERSONA_PROFILES.get(persona_type, PERSONA_PROFILES[PersonaType.TECH_NAIVE])
+        
+        if turn_count <= 2:
+            return random.choice(profile.typical_responses)
+        elif turn_count <= 5:
+            return random.choice(profile.typical_responses + profile.delay_phrases)
+        else:
+            return random.choice(cls.REPLACEMENT_RESPONSES['stall'])
+    
+    @classmethod
+    def _truncate_response(cls, response: str) -> str:
+        """Truncate response to be more SMS-like"""
+        sentences = re.split(r'(?<=[.!?])\s+', response)
+        if len(sentences) > 2:
+            return ' '.join(sentences[:2])
+        # If still too long, take first 100 chars and add ellipsis
+        if len(response) > 150:
+            return response[:100].rsplit(' ', 1)[0] + '...'
+        return response
+    
+    @classmethod
+    def _simplify_response(cls, response: str, persona_type: PersonaType) -> str:
+        """Simplify formal language for low-tech personas"""
+        simplifications = {
+            'verification': 'check',
+            'authentication': 'confirm',
+            'procedure': 'kaam',
+            'compliance': 'karna padega',
+            'documentation': 'papers',
+            'transaction': 'payment',
+            'subsequently': 'phir',
+            'furthermore': 'aur',
+            'immediately': 'abhi',
+            'regarding': 'ke baare mein'
+        }
+        
+        result = response
+        for formal, simple in simplifications.items():
+            result = re.sub(formal, simple, result, flags=re.IGNORECASE)
+        
+        return result
+    
+    @classmethod
+    def check_consistency(
+        cls, 
+        new_response: str, 
+        conversation_history: List[dict],
+        persona_type: PersonaType
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        Check if the new response is consistent with previous conversation.
+        Returns (is_consistent, inconsistency_reason)
+        """
+        if not conversation_history:
+            return True, None
+        
+        # Extract previous agent responses
+        prev_agent_msgs = [
+            m.get('content', '').lower() 
+            for m in conversation_history 
+            if m.get('role') == 'agent'
+        ][-3:]  # Check last 3 agent messages
+        
+        new_lower = new_response.lower()
+        
+        # Check for contradictory statements about availability
+        availability_stated = any(
+            any(phrase in msg for phrase in ['abhi nahi', 'busy hun', 'baad mein'])
+            for msg in prev_agent_msgs
+        )
+        immediate_availability = any(
+            phrase in new_lower for phrase in ['abhi kar raha', 'ready hun', 'kar diya']
+        )
+        if availability_stated and immediate_availability:
+            return False, "availability_contradiction"
+        
+        # Check for sudden language change
+        prev_hindi_heavy = any(
+            sum(1 for word in msg.split() if word in HINDI_PATTERNS) > len(msg.split()) * 0.3
+            for msg in prev_agent_msgs if msg
+        )
+        new_pure_english = sum(1 for word in new_lower.split() if word in HINDI_PATTERNS) == 0
+        if prev_hindi_heavy and new_pure_english and len(new_lower.split()) > 5:
+            return False, "language_style_shift"
+        
+        return True, None
+
+
 def select_persona_for_scam(scam_category, turn_count: int = 0) -> PersonaType:
     scam_category = _ensure_scam_category(scam_category)
     candidates = SCAM_PERSONA_MAPPING.get(scam_category, SCAM_PERSONA_MAPPING[ScamCategory.UNKNOWN])
@@ -551,22 +746,42 @@ async def generate_persona_response(
     scam_category,
     scammer_message: str,
     conversation_history: List[dict],
-    turn_count: int
+    turn_count: int,
+    context_hint: str = ""
 ) -> str:
     persona_type = _ensure_persona_type(persona_type)
     scam_category = _ensure_scam_category(scam_category)
     
     scammer_lang = detect_scammer_language(scammer_message, conversation_history)
     
+    response = None
+    
     if settings.gemini_api_key:
         try:
-            return await _generate_ai_persona_response(
+            response = await _generate_ai_persona_response(
                 persona_type, scam_category, scammer_message, 
-                conversation_history, turn_count, scammer_lang
+                conversation_history, turn_count, scammer_lang, context_hint
             )
         except Exception:
             pass
-    return _generate_template_response(persona_type, turn_count, scammer_lang)
+    
+    if response is None:
+        response = _generate_template_response(persona_type, turn_count, scammer_lang)
+    
+    # Self-correction: Validate and fix problematic responses
+    response = ResponseSelfCorrector.correct_response(
+        response, persona_type, scam_category, turn_count
+    )
+    
+    # Consistency check: Ensure response aligns with conversation history
+    is_consistent, reason = ResponseSelfCorrector.check_consistency(
+        response, conversation_history, persona_type
+    )
+    if not is_consistent:
+        # If inconsistent, get a safer template response
+        response = ResponseSelfCorrector._get_safe_replacement(persona_type, turn_count)
+    
+    return response
 
 
 async def _generate_ai_persona_response(
@@ -575,7 +790,8 @@ async def _generate_ai_persona_response(
     scammer_message: str,
     conversation_history: List[dict],
     turn_count: int,
-    scammer_lang: LanguageStyle = LanguageStyle.HINGLISH_HEAVY_ENGLISH
+    scammer_lang: LanguageStyle = LanguageStyle.HINGLISH_HEAVY_ENGLISH,
+    context_hint: str = ""
 ) -> str:
     client = _get_genai_client()
     if client is None:
@@ -588,6 +804,11 @@ async def _generate_ai_persona_response(
         f"{'Scammer' if m.get('role') in ('user', 'scammer') else 'Me'}: {m.get('content', '')}"
         for m in conversation_history[-6:]
     ])
+    
+    # Add context hint section if provided
+    context_section = ""
+    if context_hint:
+        context_section = f"\nCONTEXT HINT (use to maintain conversation coherence): {context_hint}\n"
 
     prompt = f"""You are roleplaying as a potential scam victim in India to engage and waste a scammer's time while gathering intelligence.
 
@@ -600,7 +821,7 @@ PERSONA DETAILS:
 SCAM TYPE DETECTED: {scam_category.value}
 
 {lang_instruction}
-
+{context_section}
 CRITICAL RULES:
 1. NEVER reveal you know it's a scam - no words like "scam", "fraud", "fake", "cheat", "dhoka"
 2. NEVER mention AI, bot, honeypot, system, or that you're testing
@@ -623,7 +844,7 @@ TURN NUMBER: {turn_count}
 Generate ONE short, realistic response as this persona. Just the response text, nothing else:"""
 
     response = await client.aio.models.generate_content(
-        model="gemini-2.0-flash",
+        model="gemini-3-flash-preview",
         contents=prompt
     )
     
