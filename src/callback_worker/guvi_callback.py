@@ -1,6 +1,6 @@
 import httpx
 from typing import Optional
-from src.models import SessionState, GuviCallbackPayload
+from src.models import SessionState, GuviCallbackPayload, GuviExtractedIntelligence
 from src.config import get_settings
 from src.utils.logging import get_logger
 from src.agent_controller.agent_state import generate_agent_notes
@@ -12,17 +12,20 @@ logger = get_logger(__name__)
 async def build_callback_payload(session: SessionState) -> GuviCallbackPayload:
     notes = await generate_agent_notes(session)
     
+    # Convert internal snake_case fields to GUVI's expected camelCase format
+    guvi_intel = GuviExtractedIntelligence(
+        bankAccounts=session.extracted_intel.bank_accounts,
+        upiIds=session.extracted_intel.upi_ids,
+        phishingLinks=session.extracted_intel.phishing_links,
+        phoneNumbers=session.extracted_intel.phone_numbers,
+        suspiciousKeywords=session.extracted_intel.suspicious_keywords
+    )
+    
     return GuviCallbackPayload(
         sessionId=session.session_id,
         scamDetected=session.scam_detected,
         totalMessagesExchanged=session.turn_count,
-        extractedIntelligence={
-            "bankAccounts": session.extracted_intel.bank_accounts,
-            "upiIds": session.extracted_intel.upi_ids,
-            "phishingLinks": session.extracted_intel.phishing_links,
-            "phoneNumbers": session.extracted_intel.phone_numbers,
-            "suspiciousKeywords": session.extracted_intel.suspicious_keywords
-        },
+        extractedIntelligence=guvi_intel,
         agentNotes=notes
     )
 

@@ -34,8 +34,9 @@ async def test_build_callback_payload(sample_session):
     assert payload.sessionId == "test-session-callback"
     assert payload.scamDetected is True
     assert payload.totalMessagesExchanged == 10
-    assert "upiIds" in payload.extractedIntelligence
-    assert "fraudster@upi" in payload.extractedIntelligence["upiIds"]
+    # Check the GuviExtractedIntelligence model has camelCase fields
+    assert hasattr(payload.extractedIntelligence, 'upiIds')
+    assert "fraudster@upi" in payload.extractedIntelligence.upiIds
 
 
 @pytest.mark.asyncio

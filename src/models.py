@@ -31,6 +31,15 @@ class ExtractedIntelligence(BaseModel):
     suspicious_keywords: List[str] = Field(default_factory=list)
 
 
+class GuviExtractedIntelligence(BaseModel):
+    """Intelligence model with camelCase for GUVI callback (hackathon format)."""
+    bankAccounts: List[str] = Field(default_factory=list)
+    upiIds: List[str] = Field(default_factory=list)
+    phishingLinks: List[str] = Field(default_factory=list)
+    phoneNumbers: List[str] = Field(default_factory=list)
+    suspiciousKeywords: List[str] = Field(default_factory=list)
+
+
 class SessionState(BaseModel):
     session_id: str
     persona_style: PersonaStyle = PersonaStyle.CONFUSED
@@ -45,10 +54,11 @@ class SessionState(BaseModel):
 
 
 class GuviCallbackPayload(BaseModel):
+    """Payload for GUVI hackathon evaluation endpoint."""
     sessionId: str
     scamDetected: bool
     totalMessagesExchanged: int
-    extractedIntelligence: dict
+    extractedIntelligence: GuviExtractedIntelligence
     agentNotes: str
 
 
