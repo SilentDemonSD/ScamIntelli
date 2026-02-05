@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from src.models import SessionState
 
 
@@ -95,12 +95,12 @@ async def update_agent_state(
     session.messages.append({
         "role": role,
         "content": message,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     })
     
     if role == "scammer":
         session.turn_count += 1
     
-    session.last_updated = datetime.utcnow()
+    session.last_updated = datetime.now(timezone.utc)
     
     return session

@@ -21,7 +21,10 @@ async def process_message(session: SessionState, message: str) -> Tuple[SessionS
     
     scam_result = await detect_scam(message)
     
-    if scam_result.is_scam and not session.scam_detected:
+    # Track if this is a newly detected scam
+    newly_detected = scam_result.is_scam and not session.scam_detected
+    
+    if newly_detected:
         session.scam_detected = True
         session.persona_style = await select_persona_style(session.turn_count, scam_result.total_score)
     
@@ -31,12 +34,18 @@ async def process_message(session: SessionState, message: str) -> Tuple[SessionS
     
     context = await create_agent_context(session, message, scam_result.total_score)
     
+    # Determine response based on scam detection and engagement status
     if context.should_end:
         session.engagement_active = False
         reply_text = await get_exit_response()
-    elif context.should_engage:
+    elif session.scam_detected and session.engagement_active:
+        # Always engage with persona when scam detected and engagement active
         reply_text = await generate_persona_response(session, message)
+    elif session.scam_detected:
+        # Scam detected but engagement ended
+        reply_text = await get_exit_response()
     else:
+        # No scam detected - neutral response
         reply_text = "Thank you for your message."
     
     session = await update_agent_state(session, reply_text, "agent")

@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     session_timeout_seconds: int = 3600
     max_engagement_turns: int = 15
-    scam_threshold: float = 0.7
+    scam_threshold: float = 0.4
 
 
 @lru_cache()

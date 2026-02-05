@@ -25,7 +25,8 @@ async def calculate_keyword_score(message: str) -> Tuple[float, List[str]]:
     if not matched_keywords:
         return 0.0, []
     
-    base_score = min(len(matched_keywords) * 0.15, 0.5)
+    # Increased base score per keyword (was 0.15, now 0.2)
+    base_score = min(len(matched_keywords) * 0.2, 0.6)
     
     categories = get_keyword_categories()
     category_bonus = 0.0
@@ -37,7 +38,8 @@ async def calculate_keyword_score(message: str) -> Tuple[float, List[str]]:
                 matched_categories.add(category)
                 break
     
-    category_bonus = len(matched_categories) * 0.1
+    # Increased category bonus (was 0.1, now 0.15)
+    category_bonus = len(matched_categories) * 0.15
     
     return min(base_score + category_bonus, 1.0), matched_keywords
 
@@ -46,21 +48,25 @@ async def calculate_intent_score(message: str) -> float:
     message_lower = message.lower()
     score = 0.0
     
+    # Increased threat weight (was 0.2/0.4, now 0.3/0.5)
     threat_count = sum(1 for k in THREAT_KEYWORDS if k in message_lower)
     if threat_count > 0:
-        score += min(threat_count * 0.2, 0.4)
+        score += min(threat_count * 0.3, 0.5)
     
+    # Increased urgency weight (was 0.15/0.3, now 0.2/0.4)
     urgency_count = sum(1 for k in URGENCY_KEYWORDS if k in message_lower)
     if urgency_count > 0:
-        score += min(urgency_count * 0.15, 0.3)
+        score += min(urgency_count * 0.2, 0.4)
     
+    # Credential requests are high priority (was 0.25/0.5, now 0.3/0.6)
     credential_count = sum(1 for k in CREDENTIAL_KEYWORDS if k in message_lower)
     if credential_count > 0:
-        score += min(credential_count * 0.25, 0.5)
+        score += min(credential_count * 0.3, 0.6)
     
+    # Payment keywords (was 0.15/0.3, now 0.2/0.4)
     payment_count = sum(1 for k in PAYMENT_KEYWORDS if k in message_lower)
     if payment_count > 0:
-        score += min(payment_count * 0.15, 0.3)
+        score += min(payment_count * 0.2, 0.4)
     
     return min(score, 1.0)
 
@@ -91,9 +97,11 @@ async def detect_scam(message: str) -> ScamScore:
     intent_score = await calculate_intent_score(message)
     pattern_score = await calculate_pattern_score(message)
     
-    total_score = (keyword_score * 0.3) + (intent_score * 0.4) + (pattern_score * 0.3)
+    # Adjusted weights: intent is most important (0.5), keywords second (0.3), patterns (0.2)
+    total_score = (keyword_score * 0.3) + (intent_score * 0.5) + (pattern_score * 0.2)
     
-    is_scam = total_score >= settings.scam_threshold
+    # Also flag as scam if intent score alone is very high (multiple scam signals)
+    is_scam = total_score >= settings.scam_threshold or intent_score >= 0.6
     
     return ScamScore(
         keyword_score=keyword_score,
