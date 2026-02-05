@@ -1,6 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
-from typing import Optional
 
 
 class Settings(BaseSettings):
@@ -19,7 +18,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     session_timeout_seconds: int = 3600
     max_engagement_turns: int = 15
-    scam_threshold: float = 0.4
+    scam_threshold: float = 0.7
     response_delay_min: float = 0.5
     response_delay_max: float = 2.5
     enable_tamper_protection: bool = True
