@@ -15,75 +15,54 @@ class MessageRequest(BaseModel):
     message: str = Field(..., min_length=1)
 
 
-# ========== GUVI Hackathon Format Models ==========
-
 class MessageContent(BaseModel):
-    """Incoming message structure per GUVI hackathon spec."""
     model_config = ConfigDict(extra='ignore')
     sender: str = Field(..., description="Sender: 'scammer' or 'user'")
     text: str = Field(..., description="Message content")
-    timestamp: Optional[Union[int, str]] = Field(default=None, description="Epoch ms or ISO-8601 timestamp")
+    timestamp: Optional[Union[int, str]] = Field(default=None)
 
 
 class ConversationMessage(BaseModel):
-    """A single message in the conversation history (hackathon format)."""
     model_config = ConfigDict(extra='ignore')
-    sender: str = Field(..., description="Sender: 'scammer' or 'user'")
-    text: str = Field(..., description="Message content")
-    timestamp: Optional[Union[int, str]] = Field(default=None, description="Epoch ms or ISO timestamp")
+    sender: str = Field(...)
+    text: str = Field(...)
+    timestamp: Optional[Union[int, str]] = Field(default=None)
 
 
 class Metadata(BaseModel):
-    """Request metadata."""
     model_config = ConfigDict(extra='ignore')
-    channel: str = Field(default="SMS", description="Channel: SMS, WhatsApp, Email, Chat")
-    language: str = Field(default="English", description="Language name")
-    locale: str = Field(default="IN", description="Locale/region code")
+    channel: str = Field(default="SMS")
+    language: str = Field(default="English")
+    locale: str = Field(default="IN")
 
 
 class HoneypotRequest(BaseModel):
-    """Incoming honeypot API request - GUVI Hackathon format."""
     model_config = ConfigDict(extra='ignore')
-    sessionId: str = Field(..., description="Unique session identifier")
-    message: Union[MessageContent, dict, Any] = Field(..., description="Incoming message object")
-    conversationHistory: List[Union[ConversationMessage, dict]] = Field(
-        default_factory=list, 
-        description="Previous messages in conversation"
-    )
-    metadata: Optional[Union[Metadata, dict, Any]] = Field(default=None, description="Request metadata")
+    sessionId: str = Field(...)
+    message: Union[MessageContent, dict, Any] = Field(...)
+    conversationHistory: List[Union[ConversationMessage, dict]] = Field(default_factory=list)
+    metadata: Optional[Union[Metadata, dict, Any]] = Field(default=None)
 
 
 class EngagementMetrics(BaseModel):
-    """Metrics about the honeypot engagement - Hackathon format."""
-    engagementDurationSeconds: int = Field(default=0, description="Total engagement duration")
-    totalMessagesExchanged: int = Field(default=0, description="Total message count")
+    engagementDurationSeconds: int = Field(default=0)
+    totalMessagesExchanged: int = Field(default=0)
 
 
 class HoneypotSimpleResponse(BaseModel):
-    """Simple honeypot API response - GUVI expects this format."""
-    status: str = Field(default="success", description="Response status")
-    reply: str = Field(..., description="AI agent reply to scammer")
+    status: str = Field(default="success")
+    reply: str = Field(...)
 
 
 class HoneypotResponse(BaseModel):
-    """Full honeypot API response - for detailed tracking."""
-    status: str = Field(default="success", description="Response status")
-    scamDetected: bool = Field(..., description="Whether scam was detected")
-    agentResponse: Optional[str] = Field(default=None, description="AI agent response to scammer")
-    engagementMetrics: EngagementMetrics = Field(
-        default_factory=EngagementMetrics, 
-        description="Engagement statistics"
-    )
-    extractedIntelligence: "GuviExtractedIntelligence" = Field(
-        default_factory=lambda: GuviExtractedIntelligence(),
-        description="Extracted intelligence data"
-    )
-    agentNotes: Optional[str] = Field(default=None, description="Summary notes from agent")
-    sessionId: str = Field(..., description="Session identifier")
-    conversationComplete: bool = Field(default=False, description="Whether conversation is complete")
-
-
-# ========== End GUVI Format Models ==========
+    status: str = Field(default="success")
+    scamDetected: bool = Field(...)
+    agentResponse: Optional[str] = Field(default=None)
+    engagementMetrics: EngagementMetrics = Field(default_factory=EngagementMetrics)
+    extractedIntelligence: "GuviExtractedIntelligence" = Field(default_factory=lambda: GuviExtractedIntelligence())
+    agentNotes: Optional[str] = Field(default=None)
+    sessionId: str = Field(...)
+    conversationComplete: bool = Field(default=False)
 
 
 class AgentReply(BaseModel):
@@ -103,7 +82,6 @@ class ExtractedIntelligence(BaseModel):
 
 
 class GuviExtractedIntelligence(BaseModel):
-    """Intelligence model with camelCase for GUVI callback (hackathon format)."""
     bankAccounts: List[str] = Field(default_factory=list)
     upiIds: List[str] = Field(default_factory=list)
     phishingLinks: List[str] = Field(default_factory=list)
@@ -112,8 +90,12 @@ class GuviExtractedIntelligence(BaseModel):
 
 
 class SessionState(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     session_id: str
     persona_style: PersonaStyle = PersonaStyle.CONFUSED
+    persona_type: Optional[Any] = Field(default=None)
+    scam_category: Optional[Any] = Field(default=None)
     extracted_intel: ExtractedIntelligence = Field(default_factory=ExtractedIntelligence)
     turn_count: int = 0
     confidence_level: float = 0.5
@@ -125,7 +107,6 @@ class SessionState(BaseModel):
 
 
 class GuviCallbackPayload(BaseModel):
-    """Payload for GUVI hackathon evaluation endpoint."""
     sessionId: str
     scamDetected: bool
     totalMessagesExchanged: int

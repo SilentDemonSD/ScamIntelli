@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Optional, Dict
 from datetime import datetime, timezone
 import json
+import asyncio
 import redis.asyncio as redis
 from src.models import SessionState, ExtractedIntelligence, PersonaStyle
 from src.config import get_settings
@@ -27,29 +28,51 @@ class BaseSessionStore(ABC):
     async def exists(self, session_id: str) -> bool:
         pass
 
+    async def cleanup_expired(self) -> int:
+        return 0
+
 
 class InMemorySessionStore(BaseSessionStore):
     def __init__(self):
         self._store: Dict[str, dict] = {}
+        self._timestamps: Dict[str, datetime] = {}
+        self._lock = asyncio.Lock()
 
     async def get(self, session_id: str) -> Optional[SessionState]:
-        data = self._store.get(session_id)
-        if data is None:
-            return None
-        return SessionState(**data)
+        async with self._lock:
+            data = self._store.get(session_id)
+            if data is None:
+                return None
+            return SessionState(**data)
 
     async def set(self, session_id: str, state: SessionState) -> None:
         state.last_updated = datetime.now(timezone.utc)
-        self._store[session_id] = json.loads(state.model_dump_json())
+        async with self._lock:
+            self._store[session_id] = json.loads(state.model_dump_json())
+            self._timestamps[session_id] = state.last_updated
 
     async def delete(self, session_id: str) -> bool:
-        if session_id in self._store:
-            del self._store[session_id]
-            return True
-        return False
+        async with self._lock:
+            if session_id in self._store:
+                del self._store[session_id]
+                self._timestamps.pop(session_id, None)
+                return True
+            return False
 
     async def exists(self, session_id: str) -> bool:
         return session_id in self._store
+
+    async def cleanup_expired(self) -> int:
+        now = datetime.now(timezone.utc)
+        expired = []
+        async with self._lock:
+            for sid, ts in self._timestamps.items():
+                if (now - ts).total_seconds() > settings.session_timeout_seconds:
+                    expired.append(sid)
+            for sid in expired:
+                self._store.pop(sid, None)
+                self._timestamps.pop(sid, None)
+        return len(expired)
 
 
 class RedisSessionStore(BaseSessionStore):

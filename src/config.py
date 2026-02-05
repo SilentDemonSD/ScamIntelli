@@ -1,9 +1,15 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
+from typing import Optional
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore"
+    )
 
     api_key: str = "default_api_key"
     gemini_api_key: str = ""
@@ -14,8 +20,23 @@ class Settings(BaseSettings):
     session_timeout_seconds: int = 3600
     max_engagement_turns: int = 15
     scam_threshold: float = 0.4
+    response_delay_min: float = 0.5
+    response_delay_max: float = 2.5
+    enable_tamper_protection: bool = True
+    max_concurrent_sessions: int = 1000
+    rate_limit_per_minute: int = 60
+    debug_mode: bool = False
+    
+    @property
+    def is_production(self) -> bool:
+        return not self.debug_mode and self.enable_tamper_protection
 
 
 @lru_cache()
 def get_settings() -> Settings:
     return Settings()
+
+
+def reload_settings() -> Settings:
+    get_settings.cache_clear()
+    return get_settings()

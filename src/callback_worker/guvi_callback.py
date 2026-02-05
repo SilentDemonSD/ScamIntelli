@@ -1,5 +1,6 @@
 import httpx
-from typing import Optional
+import asyncio
+from typing import Optional, Dict, Any
 from src.models import SessionState, GuviCallbackPayload, GuviExtractedIntelligence
 from src.config import get_settings
 from src.utils.logging import get_logger
@@ -7,6 +8,19 @@ from src.agent_controller.agent_state import generate_agent_notes
 
 settings = get_settings()
 logger = get_logger(__name__)
+
+_HTTP_CLIENT: Optional[httpx.AsyncClient] = None
+_RETRY_DELAYS = (1.0, 2.0, 4.0)
+
+
+async def get_http_client() -> httpx.AsyncClient:
+    global _HTTP_CLIENT
+    if _HTTP_CLIENT is None or _HTTP_CLIENT.is_closed:
+        _HTTP_CLIENT = httpx.AsyncClient(
+            timeout=httpx.Timeout(10.0, connect=5.0),
+            limits=httpx.Limits(max_connections=100, max_keepalive_connections=20)
+        )
+    return _HTTP_CLIENT
 
 
 async def build_callback_payload(session: SessionState) -> GuviCallbackPayload:
@@ -29,6 +43,24 @@ async def build_callback_payload(session: SessionState) -> GuviCallbackPayload:
     )
 
 
+async def _send_with_retry(client: httpx.AsyncClient, url: str, payload: Dict[str, Any], headers: Dict[str, str]) -> Optional[httpx.Response]:
+    last_error = None
+    for i, delay in enumerate(_RETRY_DELAYS):
+        try:
+            response = await client.post(url, json=payload, headers=headers)
+            if response.status_code in (200, 201, 202):
+                return response
+            if response.status_code < 500:
+                return response
+        except (httpx.TimeoutException, httpx.ConnectError) as e:
+            last_error = e
+        if i < len(_RETRY_DELAYS) - 1:
+            await asyncio.sleep(delay)
+    if last_error:
+        raise last_error
+    return None
+
+
 async def send_guvi_callback(session: SessionState) -> bool:
     if not settings.guvi_callback_url:
         logger.warning(f"GUVI callback URL not configured for session {session.session_id}")
@@ -36,23 +68,28 @@ async def send_guvi_callback(session: SessionState) -> bool:
     
     try:
         payload = await build_callback_payload(session)
+        client = await get_http_client()
         
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post(
-                settings.guvi_callback_url,
-                json=payload.model_dump(),
-                headers={
-                    "Content-Type": "application/json",
-                    "X-Session-Id": session.session_id
-                }
-            )
-            
-            if response.status_code in (200, 201, 202):
-                logger.info(f"GUVI callback successful for session {session.session_id}")
-                return True
-            else:
-                logger.error(f"GUVI callback failed with status {response.status_code}")
-                return False
+        headers = {
+            "Content-Type": "application/json",
+            "X-Session-Id": session.session_id,
+            "Accept": "application/json"
+        }
+        
+        response = await _send_with_retry(
+            client,
+            settings.guvi_callback_url,
+            payload.model_dump(),
+            headers
+        )
+        
+        if response and response.status_code in (200, 201, 202):
+            logger.info(f"GUVI callback successful for session {session.session_id}")
+            return True
+        
+        status = response.status_code if response else "no response"
+        logger.error(f"GUVI callback failed with status {status}")
+        return False
                 
     except httpx.TimeoutException:
         logger.error(f"GUVI callback timeout for session {session.session_id}")
@@ -67,8 +104,11 @@ async def send_guvi_callback(session: SessionState) -> bool:
 
 async def schedule_callback(session: SessionState) -> Optional[str]:
     success = await send_guvi_callback(session)
-    
-    if success:
-        return f"Callback sent for session {session.session_id}"
-    else:
-        return None
+    return f"Callback sent for session {session.session_id}" if success else None
+
+
+async def cleanup_client() -> None:
+    global _HTTP_CLIENT
+    if _HTTP_CLIENT and not _HTTP_CLIENT.is_closed:
+        await _HTTP_CLIENT.aclose()
+        _HTTP_CLIENT = None
