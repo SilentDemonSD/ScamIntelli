@@ -22,10 +22,14 @@ from src.persona_engine.personas import (
     get_persona_profile,
     select_persona_for_scam,
 )
+from src.persona_engine.typing_simulator import HumanTypingSimulator
 from src.scam_detector.classifier import detect_scam
+from src.scam_detector.hybrid_engine import HybridScamDetectionEngine
 from src.scam_detector.meta_detector import MetaScamDetector
 from src.scam_detector.multilingual_detector import MultiLingualDetector
 from src.scam_detector.scam_types import ScamCategory, detect_scam_category
+from src.scam_detector.url_document_detector import MultiModalScamDetector
+from src.security.jailbreak_guard import AntiJailbreakLayer
 from src.security.tamper_proof import ResponseObfuscator
 from src.session_manager.session_store import update_session
 
@@ -283,6 +287,22 @@ class EngagementStrategy:
 async def process_message(
     session: SessionState, message: str
 ) -> Tuple[SessionState, AgentReply]:
+    jailbreak_result = AntiJailbreakLayer.sanitize_input(message)
+    if jailbreak_result.is_jailbreak:
+        session = await _update_state(session, message, "scammer")
+        safe_reply = ResponseObfuscator.humanize_response(
+            jailbreak_result.safe_response, "confused_human", add_fillers=True
+        )
+        session = await _update_state(session, safe_reply, "agent")
+        await update_session(session)
+        return session, AgentReply(
+            status="success",
+            reply=safe_reply,
+            session_id=session.session_id,
+            scam_detected=session.scam_detected,
+            engagement_active=session.engagement_active,
+        )
+
     meta_result = MetaScamDetector.analyze(
         message, session.session_id, session.messages
     )
@@ -311,7 +331,23 @@ async def process_message(
         message, session.session_id
     )
 
+    url_threat_result = await MultiModalScamDetector.analyze_message(message)
+
+    if url_threat_result.intel_extracted.get("phishing_urls"):
+        existing_links = set(session.extracted_intel.phishing_links)
+        existing_links.update(url_threat_result.intel_extracted["phishing_urls"])
+        session.extracted_intel.phishing_links = list(existing_links)
+
+    hybrid_result = await HybridScamDetectionEngine.detect(
+        message=message,
+        session_messages=session.messages,
+        emotional_score=emotional_analysis.emotion_intensity,
+        multilingual_keywords=multilingual_result.scam_keywords_multilingual,
+        url_threat_score=url_threat_result.overall_threat_score,
+    )
+
     scam_result = await detect_scam(message)
+    is_scam = scam_result.is_scam or hybrid_result.is_scam
 
     if multilingual_result.scam_keywords_multilingual:
         existing_kw = set(session.extracted_intel.suspicious_keywords)
@@ -319,11 +355,11 @@ async def process_message(
         session.extracted_intel.suspicious_keywords = list(existing_kw)
 
     scam_category = ScamCategory.UNKNOWN
-    if scam_result.is_scam or session.scam_detected:
+    if is_scam or session.scam_detected:
         all_keywords = session.extracted_intel.suspicious_keywords.copy()
         scam_category, _ = detect_scam_category(message, all_keywords)
 
-    if scam_result.is_scam and not session.scam_detected:
+    if is_scam and not session.scam_detected:
         session.scam_detected = True
         session.scam_category = (
             scam_category.value
@@ -389,6 +425,12 @@ async def process_message(
         context_hint = f"{context_hint}\n{age_prompt}"
         context_hint = f"{context_hint}\nINTEL EXTRACTION: {age_adaptation.intel_extraction_hint}"
 
+        jailbreak_protection = AntiJailbreakLayer.get_system_prompt_protection()
+        context_hint = f"{jailbreak_protection}\n{context_hint}"
+
+        if url_threat_result.phishing_urls_found > 0:
+            context_hint += "\nURL DETECTED: Scammer sent suspicious URL. DO NOT click. Pretend link doesn't work, ask for details verbally instead."
+
         reply_text = await generate_persona_response(
             persona_type,
             scam_cat,
@@ -398,10 +440,19 @@ async def process_message(
             context_hint=context_hint,
         )
 
+        reply_text = _deduplicate_response(reply_text, session.messages)
+
         reply_text = await adapt_response_to_context(reply_text, message, scam_cat)
+
+        if url_threat_result.phishing_urls_found > 0 and session.turn_count <= 3:
+            reply_text = MultiModalScamDetector.get_url_avoidance_response()
 
         reply_text = AgeAdaptivePersonaEngine.apply_age_artifacts(
             reply_text, age_adaptation.selected_age_group, session.turn_count
+        )
+
+        reply_text = HumanTypingSimulator.apply_typing_artifacts(
+            reply_text, age_adaptation.selected_age_group
         )
 
         profile = get_persona_profile(persona_type)
@@ -446,6 +497,61 @@ def _map_persona_to_style(persona_type) -> PersonaStyle:
     elif persona_type in cooperative_personas:
         return PersonaStyle.COOPERATIVE
     return PersonaStyle.CONFUSED
+
+
+def _deduplicate_response(reply: str, messages: list) -> str:
+    recent_agent_msgs = [
+        m.get("content", "").strip().lower()
+        for m in messages[-10:]
+        if m.get("role") == "agent"
+    ]
+
+    if not recent_agent_msgs:
+        return reply
+
+    reply_lower = reply.strip().lower()
+
+    for prev in recent_agent_msgs:
+        if not prev or not reply_lower:
+            continue
+        if reply_lower == prev:
+            return _get_varied_response(reply, messages)
+        if len(reply_lower) > 10 and len(prev) > 10:
+            reply_words = set(reply_lower.split())
+            prev_words = set(prev.split())
+            if reply_words and prev_words:
+                overlap = len(reply_words & prev_words) / max(len(reply_words), 1)
+                if overlap > 0.8:
+                    return _get_varied_response(reply, messages)
+
+    return reply
+
+
+def _get_varied_response(original: str, messages: list) -> str:
+    import random
+
+    varied_stalls = [
+        "Ek minute sir, phone mein kuch dikkat aa rahi hai.",
+        "Haan ji, main dekh raha hun, thoda time lagega.",
+        "Sir aapka number note kar raha hun, ek second.",
+        "Abhi check kar raha hun, hold karo please.",
+        "Bhai net slow hai, page load nahi ho raha.",
+        "Arre haan haan, ruko na, kar raha hun.",
+        "Phone garam ho gaya hai sir, thoda ruk jao.",
+        "Battery low hai, charger pe laga raha hun pehle.",
+        "Ek minute, padosi bula raha hai, aata hun.",
+        "Sir pehle wala message clear nahi aaya tha, ab samjha.",
+        "Haan sir bas 2 minute, bahu khana de rahi hai.",
+        "Sorry sir, phone neeche gir gaya tha, ab batao.",
+    ]
+
+    recent_used = {
+        m.get("content", "").strip().lower()
+        for m in messages[-10:]
+        if m.get("role") == "agent"
+    }
+    available = [r for r in varied_stalls if r.lower() not in recent_used]
+    return random.choice(available) if available else random.choice(varied_stalls)
 
 
 async def _update_state(session: SessionState, message: str, role: str) -> SessionState:

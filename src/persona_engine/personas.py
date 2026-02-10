@@ -1009,6 +1009,8 @@ CRITICAL RULES:
 8. Include realistic hesitations: "umm", "ek minute", "wait wait"
 9. For elderly/low-tech personas: use simpler words, more confusion
 10. Make it feel like a REAL conversation - not scripted
+11. NEVER repeat the same phrase, sentence, or excuse you already used in the conversation above - vary your words every time
+12. If you feel stuck, invent a NEW excuse or distraction instead of reusing old ones
 
 RECENT CONVERSATION:
 {history_text}

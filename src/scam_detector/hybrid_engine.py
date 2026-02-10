@@ -1,0 +1,251 @@
+import re
+from dataclasses import dataclass
+from typing import Dict, FrozenSet, List
+
+from src.scam_detector.classifier import (
+    calculate_intent_score,
+    calculate_keyword_score,
+    calculate_pattern_score,
+)
+from src.scam_detector.keywords import (
+    CREDENTIAL_KEYWORDS,
+    THREAT_KEYWORDS,
+    URGENCY_KEYWORDS,
+)
+
+
+@dataclass(frozen=True)
+class HybridDetectionResult:
+    is_scam: bool
+    confidence: float
+    breakdown: Dict[str, float]
+    has_hard_indicators: bool
+    detection_layers_used: List[str]
+
+
+HARD_INDICATOR_PATTERNS = (
+    re.compile(r"[a-zA-Z0-9._\-]+@[a-zA-Z]+"),
+    re.compile(r"https?://\S+"),
+    re.compile(r"(?:\+91[\s\-]?)?[6-9]\d{9}"),
+)
+
+HARD_INDICATOR_PHRASES: FrozenSet[str] = frozenset(
+    {
+        "verify immediately",
+        "account block",
+        "urgent action",
+        "send otp",
+        "share otp",
+        "otp batao",
+        "otp bhejo",
+        "turant verify",
+        "account suspend",
+        "arrest warrant",
+        "digital arrest",
+        "transfer now",
+        "pay immediately",
+    }
+)
+
+BEHAVIORAL_ESCALATION_INDICATORS: FrozenSet[str] = frozenset(
+    {
+        "last chance", "final warning", "time running out",
+        "act now or else", "only 5 minutes", "do it now",
+        "aakhri mauka", "samay khatam", "abhi karo warna",
+    }
+)
+
+MULTI_VECTOR_PATTERNS: FrozenSet[str] = frozenset(
+    {
+        "click the link and enter otp",
+        "scan qr code and pay",
+        "download app and share screen",
+        "video call pe aao aur",
+        "link pe click karo aur otp",
+        "qr scan karo paisa aayega",
+    }
+)
+
+
+class HybridScamDetectionEngine:
+
+    @classmethod
+    async def detect(
+        cls,
+        message: str,
+        session_messages: List[dict] = None,
+        emotional_score: float = 0.0,
+        multilingual_keywords: List[str] = None,
+        url_threat_score: float = 0.0,
+    ) -> HybridDetectionResult:
+        scores: Dict[str, float] = {}
+        layers_used = []
+
+        keyword_score, matched_keywords = await calculate_keyword_score(message)
+        scores["keyword"] = keyword_score
+        layers_used.append("keyword")
+
+        if keyword_score < 0.1 and url_threat_score < 0.2 and emotional_score < 0.2:
+            return HybridDetectionResult(
+                is_scam=False,
+                confidence=0.95,
+                breakdown=scores,
+                has_hard_indicators=False,
+                detection_layers_used=layers_used,
+            )
+
+        intent_score = await calculate_intent_score(message)
+        scores["intent"] = intent_score
+        layers_used.append("intent")
+
+        pattern_score = await calculate_pattern_score(message)
+        scores["pattern"] = pattern_score
+        layers_used.append("pattern")
+
+        scores["emotion"] = emotional_score
+        if emotional_score > 0:
+            layers_used.append("emotion")
+
+        behavioral_score = cls._analyze_behavioral_signals(
+            message, session_messages or []
+        )
+        scores["behavioral"] = behavioral_score
+        if behavioral_score > 0:
+            layers_used.append("behavioral")
+
+        scores["url_threat"] = url_threat_score
+        if url_threat_score > 0:
+            layers_used.append("url_threat")
+
+        multilingual_boost = 0.0
+        if multilingual_keywords:
+            multilingual_boost = min(len(multilingual_keywords) * 0.05, 0.3)
+        scores["multilingual"] = multilingual_boost
+        if multilingual_boost > 0:
+            layers_used.append("multilingual")
+
+        multi_vector = cls._detect_multi_vector_attack(message)
+        scores["multi_vector"] = multi_vector
+        if multi_vector > 0:
+            layers_used.append("multi_vector")
+
+        final_score = (
+            scores["keyword"] * 0.15
+            + scores["intent"] * 0.30
+            + scores["pattern"] * 0.15
+            + scores["emotion"] * 0.10
+            + scores["behavioral"] * 0.10
+            + scores["url_threat"] * 0.10
+            + scores["multilingual"] * 0.05
+            + scores["multi_vector"] * 0.05
+        )
+
+        has_hard = cls._has_hard_indicators(message)
+
+        if final_score > 0.75 and not has_hard:
+            final_score *= 0.7
+
+        if has_hard and final_score > 0.3:
+            final_score = max(final_score, 0.72)
+
+        if multi_vector > 0.5:
+            final_score = max(final_score, 0.8)
+
+        is_scam = (
+            final_score >= 0.72
+            or intent_score >= 0.5
+            or (keyword_score >= 0.4 and pattern_score >= 0.3)
+            or (url_threat_score >= 0.7 and keyword_score >= 0.2)
+        )
+
+        return HybridDetectionResult(
+            is_scam=is_scam,
+            confidence=round(min(final_score, 1.0), 4),
+            breakdown=scores,
+            has_hard_indicators=has_hard,
+            detection_layers_used=layers_used,
+        )
+
+    @classmethod
+    def _has_hard_indicators(cls, message: str) -> bool:
+        for pattern in HARD_INDICATOR_PATTERNS:
+            if pattern.search(message):
+                return True
+        message_lower = message.lower()
+        return any(phrase in message_lower for phrase in HARD_INDICATOR_PHRASES)
+
+    @classmethod
+    def _analyze_behavioral_signals(
+        cls, message: str, session_messages: List[dict]
+    ) -> float:
+        score = 0.0
+        message_lower = message.lower()
+
+        escalation_count = sum(
+            1 for kw in BEHAVIORAL_ESCALATION_INDICATORS if kw in message_lower
+        )
+        score += min(escalation_count * 0.15, 0.4)
+
+        if not session_messages:
+            return score
+
+        recent_scammer = [
+            m.get("content", "").lower()
+            for m in session_messages[-8:]
+            if m.get("role") in ("user", "scammer")
+        ]
+
+        if len(recent_scammer) >= 3:
+            threat_escalation = 0
+            for i, msg in enumerate(recent_scammer[-3:]):
+                threat_count = sum(1 for kw in THREAT_KEYWORDS if kw in msg)
+                threat_escalation += threat_count * (i + 1)
+            if threat_escalation > 5:
+                score += 0.3
+
+        if len(recent_scammer) >= 2:
+            urgency_count = sum(
+                sum(1 for kw in URGENCY_KEYWORDS if kw in msg)
+                for msg in recent_scammer[-3:]
+            )
+            if urgency_count >= 4:
+                score += 0.2
+
+        if len(recent_scammer) >= 2:
+            credential_pressure = sum(
+                sum(1 for kw in CREDENTIAL_KEYWORDS if kw in msg)
+                for msg in recent_scammer[-3:]
+            )
+            if credential_pressure >= 3:
+                score += 0.25
+
+        return min(score, 1.0)
+
+    @classmethod
+    def _detect_multi_vector_attack(cls, message: str) -> float:
+        message_lower = message.lower()
+
+        if any(pattern in message_lower for pattern in MULTI_VECTOR_PATTERNS):
+            return 0.8
+
+        vectors = {
+            "url": bool(re.search(r"https?://", message_lower)),
+            "upi": bool(re.search(r"[a-zA-Z0-9]+@[a-zA-Z]+", message_lower)),
+            "phone": bool(re.search(r"(?:\+91)?[6-9]\d{9}", message)),
+            "credential_ask": any(
+                kw in message_lower for kw in ("otp", "pin", "password", "cvv")
+            ),
+            "threat": any(
+                kw in message_lower for kw in ("arrest", "block", "legal", "police")
+            ),
+            "action": any(
+                kw in message_lower
+                for kw in ("click", "scan", "download", "install", "share screen")
+            ),
+        }
+
+        active_vectors = sum(1 for v in vectors.values() if v)
+
+        if active_vectors >= 3:
+            return min(active_vectors * 0.2, 0.9)
+        return 0.0
