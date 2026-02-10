@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 from src.config import get_settings
 from src.intelligence_extractor.extractor import (
@@ -6,6 +6,10 @@ from src.intelligence_extractor.extractor import (
     has_sufficient_intelligence,
 )
 from src.models import AgentReply, ExtractedIntelligence, PersonaStyle, SessionState
+from src.persona_engine.age_adaptive import AgeAdaptivePersonaEngine
+from src.persona_engine.emotional_intelligence import (
+    EmotionalIntelligenceEngine,
+)
 from src.persona_engine.personas import (
     LanguageStyle,
     PersonaType,
@@ -19,6 +23,8 @@ from src.persona_engine.personas import (
     select_persona_for_scam,
 )
 from src.scam_detector.classifier import detect_scam
+from src.scam_detector.meta_detector import MetaScamDetector
+from src.scam_detector.multilingual_detector import MultiLingualDetector
 from src.scam_detector.scam_types import ScamCategory, detect_scam_category
 from src.security.tamper_proof import ResponseObfuscator
 from src.session_manager.session_store import update_session
@@ -28,7 +34,7 @@ settings = get_settings()
 
 class ConversationContextTracker:
     @staticmethod
-    def analyze_conversation_flow(messages: List[dict]) -> Dict[str, any]:
+    def analyze_conversation_flow(messages: List[dict]) -> Dict[str, Any]:
         context = {
             "scammer_urgency": 0,
             "agent_compliance_shown": 0,
@@ -138,7 +144,7 @@ class ConversationContextTracker:
         return context
 
     @staticmethod
-    def get_contextual_response_hint(context: Dict[str, any], turn_count: int) -> str:
+    def get_contextual_response_hint(context: Dict[str, Any], turn_count: int) -> str:
         hints = []
 
         if context["emotional_state"] == "fearful":
@@ -277,7 +283,40 @@ class EngagementStrategy:
 async def process_message(
     session: SessionState, message: str
 ) -> Tuple[SessionState, AgentReply]:
+    meta_result = MetaScamDetector.analyze(
+        message, session.session_id, session.messages
+    )
+
+    if meta_result.is_probe and meta_result.probe_type:
+        counter_response = MetaScamDetector.get_counter_response(meta_result.probe_type)
+        session = await _update_state(session, message, "scammer")
+        counter_response = ResponseObfuscator.humanize_response(
+            counter_response, "confused_human", add_fillers=True
+        )
+        session = await _update_state(session, counter_response, "agent")
+        await update_session(session)
+        return session, AgentReply(
+            status="success",
+            reply=counter_response,
+            session_id=session.session_id,
+            scam_detected=session.scam_detected,
+            engagement_active=session.engagement_active,
+        )
+
+    emotional_analysis = EmotionalIntelligenceEngine.analyze(
+        message, session.session_id, session.messages
+    )
+
+    multilingual_result = await MultiLingualDetector.analyze(
+        message, session.session_id
+    )
+
     scam_result = await detect_scam(message)
+
+    if multilingual_result.scam_keywords_multilingual:
+        existing_kw = set(session.extracted_intel.suspicious_keywords)
+        existing_kw.update(multilingual_result.scam_keywords_multilingual)
+        session.extracted_intel.suspicious_keywords = list(existing_kw)
 
     scam_category = ScamCategory.UNKNOWN
     if scam_result.is_scam or session.scam_detected:
@@ -292,6 +331,14 @@ async def process_message(
             else str(scam_category)
         )
         persona_type = select_persona_for_scam(scam_category, session.turn_count)
+
+        age_adaptation = AgeAdaptivePersonaEngine.adapt_persona(
+            persona_type,
+            session.scam_category,
+            session.turn_count,
+        )
+        persona_type = age_adaptation.adapted_persona
+
         session.persona_type = (
             persona_type.value if hasattr(persona_type, "value") else str(persona_type)
         )
@@ -300,6 +347,12 @@ async def process_message(
     session.extracted_intel = await extract_all_intelligence(
         message, session.extracted_intel
     )
+
+    if multilingual_result.translated_text:
+        translated_intel = await extract_all_intelligence(
+            multilingual_result.translated_text, session.extracted_intel
+        )
+        session.extracted_intel = translated_intel
 
     session = await _update_state(session, message, "scammer")
 
@@ -315,13 +368,26 @@ async def process_message(
         persona_type = _ensure_persona_type(session.persona_type)
         scam_cat = _ensure_scam_category(session.scam_category)
 
-        # Analyze conversation context for better multi-turn coherence
         conv_context = ConversationContextTracker.analyze_conversation_flow(
             session.messages
         )
         context_hint = ConversationContextTracker.get_contextual_response_hint(
             conv_context, session.turn_count
         )
+
+        emotion_hint = EmotionalIntelligenceEngine.get_emotion_hint(emotional_analysis)
+        context_hint = f"{context_hint}; {emotion_hint}" if context_hint else emotion_hint
+
+        age_adaptation = AgeAdaptivePersonaEngine.adapt_persona(
+            persona_type,
+            scam_cat.value if hasattr(scam_cat, "value") else str(scam_cat),
+            session.turn_count,
+        )
+        age_prompt = AgeAdaptivePersonaEngine.get_age_prompt_modifier(
+            age_adaptation.selected_age_group
+        )
+        context_hint = f"{context_hint}\n{age_prompt}"
+        context_hint = f"{context_hint}\nINTEL EXTRACTION: {age_adaptation.intel_extraction_hint}"
 
         reply_text = await generate_persona_response(
             persona_type,
@@ -333,6 +399,10 @@ async def process_message(
         )
 
         reply_text = await adapt_response_to_context(reply_text, message, scam_cat)
+
+        reply_text = AgeAdaptivePersonaEngine.apply_age_artifacts(
+            reply_text, age_adaptation.selected_age_group, session.turn_count
+        )
 
         profile = get_persona_profile(persona_type)
         reply_text = ResponseObfuscator.humanize_response(
@@ -414,6 +484,12 @@ async def get_engagement_summary(session: SessionState) -> dict:
     scam_category = _ensure_scam_category(getattr(session, "scam_category", None))
     persona_type = _ensure_persona_type(getattr(session, "persona_type", None))
 
+    age_adaptation = AgeAdaptivePersonaEngine.adapt_persona(
+        persona_type,
+        scam_category.value if scam_category else "unknown",
+        session.turn_count,
+    )
+
     return {
         "session_id": session.session_id,
         "scam_detected": session.scam_detected,
@@ -422,6 +498,7 @@ async def get_engagement_summary(session: SessionState) -> dict:
         "persona_used": persona_type.value
         if persona_type
         else session.persona_style.value,
+        "age_group": age_adaptation.selected_age_group.value,
         "intelligence_collected": {
             "upi_ids": len(session.extracted_intel.upi_ids),
             "phone_numbers": len(session.extracted_intel.phone_numbers),

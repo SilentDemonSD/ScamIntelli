@@ -8,7 +8,7 @@ class Settings(BaseSettings):
         env_file=".env", env_file_encoding="utf-8", case_sensitive=False, extra="ignore"
     )
 
-    api_key: str = "default_api_key"
+    api_key: str = ""
     gemini_api_key: str = ""
     guvi_callback_url: str = ""
     redis_url: str = "redis://localhost:6379"
@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     enable_tamper_protection: bool = True
     max_concurrent_sessions: int = 1000
     rate_limit_per_minute: int = 60
+    sarvam_api_key: str = ""
     debug_mode: bool = False
 
     @property

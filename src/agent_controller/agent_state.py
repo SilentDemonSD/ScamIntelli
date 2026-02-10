@@ -87,15 +87,13 @@ async def generate_agent_notes(session: SessionState) -> str:
     if intel_items:
         notes_parts.append(f"Intel: {'; '.join(intel_items)}")
 
-    tactics = _analyze_threat_tactics(intel.suspicious_keywords)
-    if tactics:
+    if tactics := _analyze_threat_tactics(intel.suspicious_keywords):
         notes_parts.append(f"Tactics: {tactics}")
 
     risk_level = _assess_risk_level(intel, session.turn_count)
     notes_parts.append(f"Risk: {risk_level}")
 
-    behavior = _analyze_scammer_behavior(session.messages)
-    if behavior:
+    if behavior := _analyze_scammer_behavior(session.messages):
         notes_parts.append(f"Behavior: {behavior}")
 
     return ". ".join(notes_parts)
