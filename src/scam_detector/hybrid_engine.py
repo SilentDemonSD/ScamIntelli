@@ -1,6 +1,6 @@
 import re
 from dataclasses import dataclass
-from typing import Dict, FrozenSet, List
+from typing import Any, Dict, FrozenSet, List
 
 from src.scam_detector.classifier import (
     calculate_intent_score,
@@ -13,6 +13,7 @@ from src.scam_detector.keywords import (
     URGENCY_KEYWORDS,
 )
 from src.scam_detector.ml_engine import (
+    AdvancedFeatureExtractor,
     MLScamDetector,
     PatternLearner,
 )
@@ -266,3 +267,119 @@ class HybridScamDetectionEngine:
         if active_vectors >= 3:
             return min(active_vectors * 0.2, 0.9)
         return 0.0
+
+    @classmethod
+    async def detect_with_explanation(
+        cls,
+        message: str,
+        session_messages: List[dict] = None,
+        emotional_score: float = 0.0,
+        multilingual_keywords: List[str] = None,
+        url_threat_score: float = 0.0,
+    ) -> Dict[str, Any]:
+        result = await cls.detect(
+            message, session_messages, emotional_score,
+            multilingual_keywords, url_threat_score,
+        )
+
+        advanced_features = AdvancedFeatureExtractor.extract_advanced_features(
+            message, session_messages
+        )
+
+        layer_weights = {
+            "keyword": 0.12,
+            "intent": 0.25,
+            "pattern": 0.12,
+            "emotion": 0.08,
+            "behavioral": 0.08,
+            "url_threat": 0.08,
+            "multilingual": 0.04,
+            "multi_vector": 0.05,
+            "ml_model": 0.12,
+            "learned_patterns": 0.06,
+        }
+
+        layer_contributions = {}
+        for layer_name, weight in layer_weights.items():
+            score = result.breakdown.get(layer_name, 0.0)
+            contribution = score * weight
+            layer_contributions[layer_name] = {
+                "raw_score": round(score, 4),
+                "weight": weight,
+                "contribution": round(contribution, 4),
+                "percentage": round(
+                    contribution / max(result.confidence, 0.001) * 100, 2
+                ),
+            }
+
+        sorted_layers = sorted(
+            layer_contributions.items(),
+            key=lambda x: x[1]["contribution"],
+            reverse=True,
+        )
+
+        top_signals = []
+        for layer_name, details in sorted_layers[:5]:
+            if details["raw_score"] > 0:
+                top_signals.append({
+                    "signal": layer_name,
+                    "strength": details["raw_score"],
+                    "impact": details["percentage"],
+                })
+
+        risk_factors = []
+        if result.breakdown.get("keyword", 0) > 0.3:
+            risk_factors.append("High scam keyword density detected")
+        if result.breakdown.get("intent", 0) > 0.4:
+            risk_factors.append("Strong malicious intent signals")
+        if result.breakdown.get("behavioral", 0) > 0.3:
+            risk_factors.append("Behavioral escalation pattern detected")
+        if result.breakdown.get("url_threat", 0) > 0.5:
+            risk_factors.append("Suspicious URL/link detected")
+        if result.breakdown.get("multi_vector", 0) > 0.3:
+            risk_factors.append("Multi-vector attack pattern")
+        if result.has_hard_indicators:
+            risk_factors.append("Hard indicators present (UPI/phone/link)")
+
+        psych_tactics = []
+        if advanced_features.get("psych_fear_appeal_score", 0) > 0.3:
+            psych_tactics.append("Fear/threat appeals")
+        if advanced_features.get("psych_authority_claim_score", 0) > 0.3:
+            psych_tactics.append("Authority impersonation")
+        if advanced_features.get("psych_scarcity_score", 0) > 0.3:
+            psych_tactics.append("Artificial scarcity")
+        if advanced_features.get("psych_social_proof_score", 0) > 0.3:
+            psych_tactics.append("Social proof manipulation")
+        if advanced_features.get("psych_reciprocity_score", 0) > 0.3:
+            psych_tactics.append("Reciprocity exploitation")
+        if advanced_features.get("psych_emotional_manipulation", 0) > 0.3:
+            psych_tactics.append("Emotional manipulation")
+
+        if result.confidence >= 0.85:
+            risk_level = "critical"
+        elif result.confidence >= 0.72:
+            risk_level = "high"
+        elif result.confidence >= 0.5:
+            risk_level = "medium"
+        elif result.confidence >= 0.3:
+            risk_level = "low"
+        else:
+            risk_level = "minimal"
+
+        return {
+            "detection_result": {
+                "is_scam": result.is_scam,
+                "confidence": result.confidence,
+                "risk_level": risk_level,
+                "has_hard_indicators": result.has_hard_indicators,
+            },
+            "layer_breakdown": dict(sorted_layers),
+            "top_signals": top_signals,
+            "risk_factors": risk_factors,
+            "psychological_tactics": psych_tactics,
+            "advanced_features": {
+                k: round(v, 4) for k, v in advanced_features.items()
+            },
+            "detection_layers_used": result.detection_layers_used,
+            "score_breakdown": result.breakdown,
+        }

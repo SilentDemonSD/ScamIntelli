@@ -109,6 +109,7 @@ class SessionState(BaseModel):
     scam_detected: bool = False
     engagement_active: bool = True
     messages: List[dict] = Field(default_factory=list)
+    detection_details: Optional[dict] = Field(default=None)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     last_updated: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 

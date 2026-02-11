@@ -37,12 +37,38 @@ async def build_callback_payload(session: SessionState) -> GuviCallbackPayload:
         suspiciousKeywords=session.extracted_intel.suspicious_keywords,
     )
 
+    from src.intelligence_extractor.network_analyzer import get_network_analyzer
+    from src.intelligence_extractor.behavioral_fingerprint import get_fingerprinter
+
+    analyzer = get_network_analyzer()
+    analyzer.add_intelligence(session.session_id, session.extracted_intel)
+    network_connections = analyzer.get_session_connections(session.session_id)
+
+    fingerprinter = get_fingerprinter()
+    fp = fingerprinter.create_fingerprint(session.session_id, session.messages)
+    fingerprint_data = None
+    if fp:
+        fingerprinter.store_fingerprint(fp)
+        matches = fingerprinter.match_fingerprint(fp)
+        fingerprint_data = {
+            "fingerprint_id": fp.fingerprint_id,
+            "signature_hash": fp.signature_hash,
+            "pressure_pattern": fp.escalation.pressure_pattern,
+            "matches_found": len(matches),
+        }
+
+    enriched_notes = notes
+    if network_connections.get("connected_sessions"):
+        enriched_notes += f" | Network: {len(network_connections['connected_sessions'])} connected sessions, risk={network_connections['risk_level']}"
+    if fingerprint_data and fingerprint_data["matches_found"] > 0:
+        enriched_notes += f" | Fingerprint matches: {fingerprint_data['matches_found']}"
+
     return GuviCallbackPayload(
         sessionId=session.session_id,
         scamDetected=session.scam_detected,
         totalMessagesExchanged=session.turn_count,
         extractedIntelligence=guvi_intel,
-        agentNotes=notes,
+        agentNotes=enriched_notes,
     )
 
 

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: scamintelli
+  labels:
+    app.kubernetes.io/name: scamintelli
+    app.kubernetes.io/part-of: scamintelli

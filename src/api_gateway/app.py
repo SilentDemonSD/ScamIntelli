@@ -77,6 +77,14 @@ async def lifespan(app: FastAPI):
     global _cleanup_task
     logger.info("Starting Scam Honeypot API")
     _cleanup_task = asyncio.create_task(periodic_cleanup())
+
+    from src.intelligence_extractor.network_analyzer import get_network_analyzer
+    from src.intelligence_extractor.behavioral_fingerprint import get_fingerprinter
+
+    get_network_analyzer()
+    get_fingerprinter()
+    logger.info("Initialized network analyzer and behavioral fingerprinter")
+
     yield
     if _cleanup_task:
         _cleanup_task.cancel()

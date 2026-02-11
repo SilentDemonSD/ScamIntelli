@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scamintelli-config
+  namespace: scamintelli
+  labels:
+    app.kubernetes.io/name: scamintelli
+data:
+  LOG_LEVEL: "INFO"
+  USE_REDIS: "true"
+  REDIS_URL: "redis://redis-service:6379"
+  SESSION_TIMEOUT_SECONDS: "3600"
+  MAX_ENGAGEMENT_TURNS: "15"
+  SCAM_THRESHOLD: "0.7"
+  ENABLE_TAMPER_PROTECTION: "true"
+  MAX_CONCURRENT_SESSIONS: "1000"
+  RATE_LIMIT_PER_MINUTE: "60"
+  PYTHONPATH: "/app"
+  PYTHONUNBUFFERED: "1"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: scamintelli-secrets
+  namespace: scamintelli
+  labels:
+    app.kubernetes.io/name: scamintelli
+type: Opaque
+stringData:
+  API_KEY: "REPLACE_WITH_API_KEY"
+  GEMINI_API_KEY: "REPLACE_WITH_GEMINI_KEY"
+  GUVI_CALLBACK_URL: "REPLACE_WITH_CALLBACK_URL"
