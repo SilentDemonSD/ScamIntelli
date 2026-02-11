@@ -7,7 +7,6 @@ from src.models import PersonaStyle, SessionState
 
 settings = get_settings()
 
-# Initialize Gemini client (will be created lazily)
 _genai_client = None
 
 

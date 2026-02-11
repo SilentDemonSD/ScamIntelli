@@ -12,6 +12,10 @@ from src.scam_detector.keywords import (
     THREAT_KEYWORDS,
     URGENCY_KEYWORDS,
 )
+from src.scam_detector.ml_engine import (
+    MLScamDetector,
+    PatternLearner,
+)
 
 
 @dataclass(frozen=True)
@@ -129,15 +133,28 @@ class HybridScamDetectionEngine:
         if multi_vector > 0:
             layers_used.append("multi_vector")
 
+        ml_prediction = await MLScamDetector.predict(message, session_messages)
+        scores["ml_model"] = ml_prediction.confidence
+        layers_used.append(f"ml:{ml_prediction.model_used}")
+
+        pattern_score_learned = PatternLearner.get_pattern_score(message)
+        scores["learned_patterns"] = pattern_score_learned
+        if pattern_score_learned > 0:
+            layers_used.append("learned_patterns")
+
+        MLScamDetector.save_training_sample(message, True if scores["keyword"] > 0.3 else False)
+
         final_score = (
-            scores["keyword"] * 0.15
-            + scores["intent"] * 0.30
-            + scores["pattern"] * 0.15
-            + scores["emotion"] * 0.10
-            + scores["behavioral"] * 0.10
-            + scores["url_threat"] * 0.10
-            + scores["multilingual"] * 0.05
+            scores["keyword"] * 0.12
+            + scores["intent"] * 0.25
+            + scores["pattern"] * 0.12
+            + scores["emotion"] * 0.08
+            + scores["behavioral"] * 0.08
+            + scores["url_threat"] * 0.08
+            + scores["multilingual"] * 0.04
             + scores["multi_vector"] * 0.05
+            + scores["ml_model"] * 0.12
+            + scores["learned_patterns"] * 0.06
         )
 
         has_hard = cls._has_hard_indicators(message)

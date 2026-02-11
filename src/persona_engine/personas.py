@@ -1009,8 +1009,18 @@ CRITICAL RULES:
 8. Include realistic hesitations: "umm", "ek minute", "wait wait"
 9. For elderly/low-tech personas: use simpler words, more confusion
 10. Make it feel like a REAL conversation - not scripted
-11. NEVER repeat the same phrase, sentence, or excuse you already used in the conversation above - vary your words every time
-12. If you feel stuck, invent a NEW excuse or distraction instead of reusing old ones
+
+ANTI-REPETITION RULES (VERY IMPORTANT):
+11. READ the conversation history above CAREFULLY. NEVER repeat or paraphrase anything you already said.
+12. If stuck, create a COMPLETELY NEW excuse, question, or distraction. Do NOT reuse "ek minute", "ruko", "dhundh raha hun" if already said before.
+13. Track what excuses/stalls you've used. Each response must be UNIQUE in wording AND meaning.
+14. Vary your sentence structure, length, and tone across turns.
+
+CONTEXT AWARENESS RULES:
+15. Pay close attention to EXACTLY what the scammer is asking for RIGHT NOW. If they ask for OTP, talk about OTP specifically - NOT password or PIN.
+16. If the scammer mentions a specific topic (OTP, payment, link, etc.), your response MUST address that exact topic.
+17. Maintain continuity with what you said in previous messages. If you said "abhi dhundh raha hun", follow up on that action.
+18. NEVER contradict yourself - if you said "bank jaana padega", don't suddenly say "already bank mein hun" unless time has passed.
 
 RECENT CONVERSATION:
 {history_text}
@@ -1065,7 +1075,10 @@ def get_exit_response(persona_type) -> str:
 
 
 async def adapt_response_to_context(
-    base_response: str, scammer_message: str, scam_category
+    base_response: str,
+    scammer_message: str,
+    scam_category,
+    conversation_history: list = None,
 ) -> str:
     scam_category = _ensure_scam_category(scam_category)
     scammer_lower = scammer_message.lower()
@@ -1073,30 +1086,120 @@ async def adapt_response_to_context(
 
     is_formal = scammer_lang == LanguageStyle.FORMAL_ENGLISH
 
-    if any(kw in scammer_lower for kw in ["otp", "pin", "password", "cvv"]):
-        if is_formal:
-            delays = [
-                "Sir, ek minute. OTP dhundh raha hun messages mein...",
-                "Which OTP sir? Bahut saare messages aaye hain.",
-                "Password yaad nahi aa raha, let me check my diary.",
-                "Sir please hold, phone mein bahut apps hain.",
-            ]
-        else:
-            delays = [
-                "Ek minute, dhundh raha hun...",
-                "Konsa OTP? Bahut saare messages aaye hain.",
-                "Password yaad nahi aa raha, ruko.",
-                "Phone mein bahut apps hain, konse wala?",
-            ]
-        return random.choice(delays)
+    used_responses = set()
+    if conversation_history:
+        for m in conversation_history[-12:]:
+            if m.get("role") == "agent":
+                used_responses.add(m.get("content", "").strip().lower())
 
-    if any(kw in scammer_lower for kw in ["upi", "transfer", "send", "pay", "amount"]):
+    def _pick_unique(pool: list) -> str:
+        available = [r for r in pool if r.strip().lower() not in used_responses]
+        return random.choice(available) if available else random.choice(pool)
+
+    otp_keywords = ["otp", "one time", "verification code", "code bhejo", "otp batao", "otp bhejo"]
+    pin_keywords = ["pin", "atm pin", "mpin"]
+    password_keywords = ["password", "passcode", "passkey"]
+    cvv_keywords = ["cvv", "cvv number", "card number", "card ke peeche"]
+
+    has_otp = any(kw in scammer_lower for kw in otp_keywords)
+    has_pin = any(kw in scammer_lower for kw in pin_keywords)
+    has_password = any(kw in scammer_lower for kw in password_keywords)
+    has_cvv = any(kw in scammer_lower for kw in cvv_keywords)
+
+    if has_otp or has_pin or has_password or has_cvv:
+        if has_otp:
+            if is_formal:
+                delays = [
+                    "Sir, ek minute. OTP dhundh raha hun messages mein...",
+                    "Which OTP sir? Bahut saare messages aaye hain.",
+                    "Sir OTP aaya tha lekin delete ho gaya shayad...",
+                    "Sir please hold, OTP ke liye messages check kar raha hun.",
+                    "Arey haan OTP aaya tha, ruko dhundh raha hun.",
+                    "Sir OTP wala message kahan gaya, inbox full hai.",
+                    "One second sir, OTP dekhna hai notification mein.",
+                    "Sir bahut saare OTP aate rehte hain, konsa wala?",
+                ]
+            else:
+                delays = [
+                    "Ek minute, OTP dhundh raha hun messages mein...",
+                    "Konsa OTP? Bahut saare messages aaye hain.",
+                    "OTP wala message kahan gaya? Ruko dekho...",
+                    "Phone mein bahut messages hain, OTP dhundh raha hun.",
+                    "Arey haan OTP aaya tha, notification mein dekho ruko.",
+                    "OTP expire toh nahi ho gaya? Check karta hun.",
+                    "Ruko ruko, OTP ke liye message khol raha hun.",
+                    "OTP... haan ek second, inbox mein dhundh raha hun.",
+                ]
+        elif has_pin:
+            if is_formal:
+                delays = [
+                    "Sir, ATM PIN yaad nahi aa raha, sochne do.",
+                    "PIN toh bahut purana hai sir, diary mein likha tha.",
+                    "Sir ek minute, PIN change kiya tha recently.",
+                    "Konsa PIN sir? ATM wala ya phone wala?",
+                    "Sir PIN kahin likha tha, dhundh raha hun.",
+                    "PIN... haan sir, ek second sochne do.",
+                ]
+            else:
+                delays = [
+                    "PIN yaad nahi aa raha, sochne do...",
+                    "PIN toh bahut purana hai, diary mein likha tha kahin.",
+                    "Konsa PIN? ATM wala ya UPI wala?",
+                    "Ek minute, PIN change kiya tha, naya yaad nahi.",
+                    "PIN kahin note kiya tha, ruko dhundhta hun.",
+                    "PIN... haan ruko sochne do ek second.",
+                ]
+        elif has_password:
+            if is_formal:
+                delays = [
+                    "Sir, password kahin note kiya tha, let me check.",
+                    "Password bahut complex rakha tha sir, yaad karna padega.",
+                    "Sir ek minute, password diary mein likha hai.",
+                    "Password toh change kiya tha recently sir.",
+                    "Sir password wala file computer mein hai, ruko.",
+                    "Haan sir password... ek second diary nikalta hun.",
+                ]
+            else:
+                delays = [
+                    "Password kahin likha tha, ruko dhundhta hun.",
+                    "Password bahut complex hai, yaad karna padega.",
+                    "Ek minute, password diary mein hai kahin.",
+                    "Password toh change kiya tha, naya yaad nahi.",
+                    "Ruko password wali file dhundh raha hun.",
+                    "Password... haan ek second, sochne do.",
+                ]
+        else:  # CVV
+            if is_formal:
+                delays = [
+                    "Sir, card pe peeche ka number dekhna padega.",
+                    "CVV kya hota hai sir? Card ke peeche wala?",
+                    "Sir card purse mein hai, nikalta hun ruko.",
+                    "CVV... sir yeh safe hai batana? Bank toh mana karta hai.",
+                    "Ek minute sir, card dhundh raha hun wallet mein.",
+                    "Sir card kahin rakha tha, dhundh raha hun.",
+                ]
+            else:
+                delays = [
+                    "Card pe peeche ka number dekhna padega, ruko.",
+                    "CVV kya hota hai? Card ke peeche wala?",
+                    "Card purse mein hai, nikalta hun ek minute.",
+                    "CVV... yeh batana safe hai na? Bank wale mana karte hain.",
+                    "Card dhundh raha hun wallet mein, ruko.",
+                    "Card kahin rakha tha... haan ruko dhundhta hun.",
+                ]
+        return _pick_unique(delays)
+
+    if any(kw in scammer_lower for kw in ["upi", "transfer", "send", "pay", "amount", "paisa", "money", "bhejo"]):
         if is_formal:
             stalls = [
                 "Sir, kitna amount transfer karna hai exactly?",
                 "Okay sir, but what is your UPI ID?",
                 "Let me check my account balance first sir.",
                 "Sir, aaj ka limit cross ho gaya. Tomorrow okay?",
+                "Sir konse account mein bhejun? Details batao.",
+                "Sir bank app open kar raha hun, ek minute lagega.",
+                "Amount bataiye sir, balance check karke batata hun.",
+                "Sir abhi bank se message aaya, maintenance chal rahi hai.",
             ]
         else:
             stalls = [
@@ -1104,19 +1207,27 @@ async def adapt_response_to_context(
                 "UPI ID kya hai aapka?",
                 "Account mein balance check karna padega.",
                 "Limit cross ho gayi hai aaj ki, kal chalega?",
+                "Konse account mein bhejna hai? Details do.",
+                "Bank app open kar raha hun, ek minute.",
+                "Kitna amount? Balance dekhke batata hun.",
+                "Abhi bank ki app mein maintenance chal rahi, wait karo.",
             ]
-        return random.choice(stalls)
+        return _pick_unique(stalls)
 
     if any(
         kw in scammer_lower
-        for kw in ["arrest", "police", "legal", "court", "case", "warrant"]
+        for kw in ["arrest", "police", "legal", "court", "case", "warrant", "jail", "fir"]
     ):
         fear_responses = [
             "Sir please, mujhe bahut dar lag raha hai. Main kya karun?",
             "Oh god, arrest? Meri family ko pata chalega kya?",
             "Sir main innocent hun, please help me!",
             "Kya jail hogi? Please sir, kuch karo!",
+            "Sir please, maine kuch galat nahi kiya! Believe karo!",
+            "Mujhe bahut tension ho rahi hai, batao kya karna hai!",
+            "Sir FIR? Meri naukri chali jaayegi!",
+            "Please sir, ghar walo ko mat batana. Main karunga jo bolo.",
         ]
-        return random.choice(fear_responses)
+        return _pick_unique(fear_responses)
 
     return base_response

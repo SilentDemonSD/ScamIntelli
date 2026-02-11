@@ -26,6 +26,7 @@ from src.persona_engine.typing_simulator import HumanTypingSimulator
 from src.scam_detector.classifier import detect_scam
 from src.scam_detector.hybrid_engine import HybridScamDetectionEngine
 from src.scam_detector.meta_detector import MetaScamDetector
+from src.scam_detector.ml_engine import PatternLearner
 from src.scam_detector.multilingual_detector import MultiLingualDetector
 from src.scam_detector.scam_types import ScamCategory, detect_scam_category
 from src.scam_detector.url_document_detector import MultiModalScamDetector
@@ -400,6 +401,12 @@ async def process_message(
         session.engagement_active = False
         persona_type = _ensure_persona_type(session.persona_type)
         reply_text = get_exit_response(persona_type)
+        if session.scam_detected:
+            PatternLearner.learn_from_conversation(
+                session.messages,
+                session.scam_category or "unknown",
+                was_scam=True,
+            )
     elif session.scam_detected and session.engagement_active:
         persona_type = _ensure_persona_type(session.persona_type)
         scam_cat = _ensure_scam_category(session.scam_category)
@@ -440,9 +447,11 @@ async def process_message(
             context_hint=context_hint,
         )
 
-        reply_text = _deduplicate_response(reply_text, session.messages)
+        reply_text = await adapt_response_to_context(
+            reply_text, message, scam_cat, session.messages
+        )
 
-        reply_text = await adapt_response_to_context(reply_text, message, scam_cat)
+        reply_text = _deduplicate_response(reply_text, session.messages)
 
         if url_threat_result.phishing_urls_found > 0 and session.turn_count <= 3:
             reply_text = MultiModalScamDetector.get_url_avoidance_response()
