@@ -4,9 +4,12 @@ services:
     container_name: scamintelli-nginx
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/certs:/etc/ssl/certs:ro
+      - ./nginx/certs:/etc/ssl/private:ro
       - nginx_logs:/var/log/nginx
     depends_on:
       api:
