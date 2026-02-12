@@ -67,11 +67,15 @@ An autonomous, multi-layered honeypot system that detects scam intent in real-ti
 │  │  Extractor       │  │  (Redis/Memory)  │  │  Worker (HTTP/2) │           │
 │  └──────────────────┘  └──────────────────┘  └──────────────────┘           │
 ├──────────────────────────────────────────────────────────────────────────────┤
-│                  Deployment & Scaling (K8s + HPA)                            │
+│              Deployment & Scaling (Docker Compose + Nginx)                   │
 │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐           │
-│  │  Docker +        │  │  HorizontalPod   │  │  Ingress + TLS   │           │
-│  │  Compose         │  │  Autoscaler      │  │  Rate Limiting   │           │
-│  │                  │  │  (2–10 replicas)  │  │                  │           │
+│  │  Nginx Reverse   │  │  Docker Compose  │  │  Gunicorn +      │           │
+│  │  Proxy + LB      │  │  --scale api=N   │  │  Uvicorn Workers │           │
+│  │  (least_conn)    │  │  (2-3 replicas)  │  │  (async ASGI)    │           │
+│  └──────────────────┘  └──────────────────┘  └──────────────────┘           │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐           │
+│  │  Cloudflare CDN  │  │  Redis Session   │  │  K8s-Ready       │           │
+│  │  + SSL + DDoS    │  │  Store (local)   │  │  Migration Path  │           │
 │  └──────────────────┘  └──────────────────┘  └──────────────────┘           │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -281,16 +285,18 @@ Automatically extracts from scammer messages:
 |-----------|------------|
 | Framework | FastAPI + Pydantic v2 |
 | Language | Python 3.11+ |
-| LLM | Google Gemini (gemini-3-flash-preview) |
+| LLM | Google Gemini (gemini-2.0-flash) |
 | ML Engine | LightGBM + NumPy |
 | Graph Analysis | NetworkX |
 | HTTP Client | httpx (HTTP/2) |
-| Session Storage | Redis (optional) / In-Memory |
+| Session Storage | Redis 7 (local container) / In-Memory |
+| Process Manager | Gunicorn + Uvicorn (async ASGI workers) |
+| Reverse Proxy | Nginx 1.27 (least_conn LB, gzip, rate limiting) |
+| CDN / SSL | Cloudflare (Full Strict SSL, HTTP/2, DDoS protection) |
 | Validation | Pydantic Settings + Custom Validators |
 | Testing | pytest + pytest-asyncio (269 tests) |
-| Containerization | Docker + Docker Compose |
-| Orchestration | Kubernetes + HPA (2–10 pod autoscaling) |
-| Deployment | Koyeb |
+| Containerization | Docker (multi-stage) + Docker Compose |
+| Orchestration | Docker Compose --scale (K8s-ready migration path) |
 
 ---
 
@@ -543,17 +549,27 @@ ScamIntelli/
 │   ├── test_behavioral_fingerprint.py     # Behavioral fingerprinting tests (13)
 │   └── test_explainability.py             # Explainability engine tests (12)
 ├── docker/
-│   ├── Dockerfile                         # Python 3.11-slim image
-│   ├── docker-compose.yml                 # API + Redis orchestration
-│   └── k8s/
-│       ├── namespace.yaml                 # scamintelli namespace
-│       ├── configmap.yaml                 # ConfigMap + Secrets
-│       ├── deployment.yaml                # API deployment (2 replicas, rolling update)
-│       ├── service.yaml                   # ClusterIP services (API + Redis)
-│       ├── redis.yaml                     # Redis deployment + PVC
-│       ├── hpa.yaml                       # HorizontalPodAutoscaler (2–10 pods)
-│       └── ingress.yaml                   # Nginx ingress + TLS
+│   ├── Dockerfile                         # Multi-stage production image (non-root)
+│   ├── docker-compose.yml                 # Nginx + API (scalable) + Redis
+│   ├── gunicorn.conf.py                   # Gunicorn + Uvicorn worker config
+│   ├── deploy.sh                          # One-command production deployment
+│   ├── sysctl-tuning.conf                 # Linux kernel tuning (TCP, BBR, etc)
+│   ├── ulimits.conf                       # File descriptor / process limits
+│   ├── ARCHITECTURE.md                    # Full architecture & ops guide
+│   ├── nginx/
+│   │   ├── nginx.conf                     # Main config (upstream, gzip, keepalive)
+│   │   └── conf.d/
+│   │       └── default.conf               # Virtual host (proxy, rate limit, CF IPs)
+│   └── k8s/                               # Future Kubernetes manifests
+│       ├── namespace.yaml
+│       ├── configmap.yaml
+│       ├── deployment.yaml
+│       ├── service.yaml
+│       ├── redis.yaml
+│       ├── hpa.yaml
+│       └── ingress.yaml
 ├── requirements.txt
+├── .dockerignore                          # Optimized build context
 ├── pytest.ini
 └── LICENSE
 ```
@@ -566,9 +582,10 @@ ScamIntelli/
 
 - Python 3.11+
 - Google Gemini API key
-- Redis (optional)
+- Docker & Docker Compose V2 (for production)
+- Redis (optional for local dev)
 
-### Setup
+### Local Development
 
 ```bash
 git clone https://github.com/SilentDemonSD/ScamIntelli.git
@@ -597,25 +614,76 @@ MAX_CONCURRENT_SESSIONS=1000
 RATE_LIMIT_PER_MINUTE=60
 ```
 
-### Run
+### Run (Development)
 
 ```bash
 uvicorn src.api_gateway.app:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### Docker
+### Docker Production Deployment
 
-```bash
-docker-compose -f docker/docker-compose.yml up --build
+Optimized for AWS m7i-flex.large (2 vCPU / 8 GB RAM) behind Cloudflare.
+
+```
+Cloudflare (TLS + HTTP/2 + DDoS)
+    │
+    ▼  port 80
+  Nginx (least_conn LB, gzip, rate limiting)
+    │
+    ├──► API container 1 (2 Uvicorn workers)
+    ├──► API container 2 (2 Uvicorn workers)
+    │
+    ▼
+  Redis (512 MB, LRU eviction, AOF persistence)
 ```
 
-### Kubernetes Deployment
+```bash
+cd docker
+
+# One-command deploy (applies sysctl + ulimits + builds + starts)
+sudo ./deploy.sh
+
+# Or manual deployment
+docker compose build --no-cache
+docker compose up -d --scale api=2 --remove-orphans
+
+# Scale during traffic spikes
+docker compose up -d --scale api=3    # Max for 2 vCPU
+
+# Scale back down
+docker compose up -d --scale api=2
+
+# View logs
+docker compose logs -f api nginx
+
+# Container stats
+docker stats
+
+# Stop
+docker compose down
+```
+
+**Container Resource Allocation (8 GB VM)**:
+
+| Container | CPU | RAM Limit | Instances |
+|-----------|-----|-----------|----------|
+| Nginx     | 0.20 | 128 MB   | 1        |
+| API       | 0.80 | 2560 MB  | 2 (default) |
+| Redis     | 0.20 | 768 MB   | 1        |
+
+**Performance Estimates (`--scale api=2`)**:
+
+| Endpoint | Est. RPS | P50 Latency |
+|----------|---------|-------------|
+| `GET /health` (JSON) | 5,000-8,000 | <1ms |
+| `POST /message` (Gemini + ML) | 50-140 | ~200ms |
+| Concurrent connections | ~1,000 | — |
+
+### Kubernetes Migration
+
+The Docker Compose setup maps 1:1 to the K8s manifests in `docker/k8s/`:
 
 ```bash
-# Build and tag the image
-docker build -t scamintelli:latest -f docker/Dockerfile .
-
-# Apply all K8s manifests
 kubectl apply -f docker/k8s/namespace.yaml
 kubectl apply -f docker/k8s/configmap.yaml
 kubectl apply -f docker/k8s/redis.yaml
@@ -623,24 +691,9 @@ kubectl apply -f docker/k8s/deployment.yaml
 kubectl apply -f docker/k8s/service.yaml
 kubectl apply -f docker/k8s/hpa.yaml
 kubectl apply -f docker/k8s/ingress.yaml
-
-# Verify deployment
-kubectl get pods -n scamintelli
-kubectl get hpa -n scamintelli
 ```
 
-**Horizontal Pod Autoscaler (HPA)** configuration:
-
-| Parameter | Value |
-|-----------|-------|
-| Min Replicas | 2 |
-| Max Replicas | 10 |
-| CPU Target | 70% utilization |
-| Memory Target | 80% utilization |
-| Scale Up | +2 pods or +50% per 60s |
-| Scale Down | -1 pod per 120s |
-| Scale Up Stabilization | 60s |
-| Scale Down Stabilization | 300s |
+See [docker/ARCHITECTURE.md](docker/ARCHITECTURE.md) for the full architecture guide, OS tuning, Cloudflare config, monitoring, and K8s migration path.
 
 ### Tests
 
@@ -651,14 +704,6 @@ pytest tests/ -v --tb=short
 ```
 269 passed in ~55s
 ```
-
----
-
-## Deployment
-
-Deployed on **Koyeb**: `https://possible-crane-primegenz-8819088f.koyeb.app/`
-
-Health check: `GET /api/v1/health`
 
 ---
 

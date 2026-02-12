@@ -1,45 +1,153 @@
-version: '3.8'
-
 services:
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: scamintelli-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.20"
+          memory: 128M
+        reservations:
+          cpus: "0.05"
+          memory: 32M
+    networks:
+      - scamintelli
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost/nginx-health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+
   api:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
+    env_file:
+      - ../.env
     environment:
-      - API_KEY=${API_KEY:-default_api_key}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - GUVI_CALLBACK_URL=${GUVI_CALLBACK_URL}
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://redis:6379/0
       - USE_REDIS=true
-      - LOG_LEVEL=INFO
+      - LOG_LEVEL=WARNING
       - SESSION_TIMEOUT_SECONDS=3600
       - MAX_ENGAGEMENT_TURNS=15
       - SCAM_THRESHOLD=0.7
+      - DEBUG_MODE=false
+      - ENABLE_TAMPER_PROTECTION=true
+      - GUNICORN_WORKERS=2
+      - GUNICORN_MAX_REQUESTS=2000
+      - GUNICORN_MAX_REQUESTS_JITTER=200
+      - GUNICORN_TIMEOUT=30
+      - GUNICORN_KEEPALIVE=5
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     volumes:
-      - ../scamsession.txt:/app/scamsession.txt
+      - app_sessions:/app/sessions
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.80"
+          memory: 2560M
+        reservations:
+          cpus: "0.30"
+          memory: 512M
+    networks:
+      - scamintelli
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/api/v1/health"]
+      interval: 15s
+      timeout: 5s
       retries: 3
+      start_period: 10s
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    container_name: scamintelli-redis
+    command: >
+      redis-server
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --save 60 1000
+      --save 300 100
+      --appendonly yes
+      --appendfsync everysec
+      --tcp-backlog 511
+      --tcp-keepalive 300
+      --timeout 300
+      --hz 10
+      --lfu-log-factor 10
+      --activedefrag yes
+      --bind 0.0.0.0
+      --protected-mode no
+    expose:
+      - "6379"
     volumes:
       - redis_data:/data
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.20"
+          memory: 768M
+        reservations:
+          cpus: "0.05"
+          memory: 256M
+    networks:
+      - scamintelli
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
-      timeout: 5s
-      retries: 3
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
 
 volumes:
   redis_data:
+    driver: local
+  nginx_logs:
+    driver: local
+  app_sessions:
+    driver: local
+
+networks:
+  scamintelli:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
