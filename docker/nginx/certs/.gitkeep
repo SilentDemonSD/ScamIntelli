@@ -1,0 +1,6 @@
+Place your Cloudflare Origin Certificate files here:
+
+  origin.pem       - Certificate (PEM)
+  origin-key.pem   - Private Key (PEM)
+
+Generate from: Cloudflare Dashboard > SSL/TLS > Origin Server > Create Certificate

@@ -209,3 +209,8 @@ __marimo__/
 # Project-specific
 scamsession.txt
 redis_data/
+
+# SSL/TLS certificates
+docker/nginx/certs/*.pem
+docker/nginx/certs/*.key
+!docker/nginx/certs/.gitkeep
