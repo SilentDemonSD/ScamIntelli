@@ -1,3 +1,5 @@
+import random
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Tuple
 
 from src.config import get_settings
@@ -472,7 +474,7 @@ async def process_message(
         persona_type = _ensure_persona_type(session.persona_type)
         reply_text = get_exit_response(persona_type)
     else:
-        reply_text = "Thank you for your message."
+        reply_text = _generate_dynamic_non_scam_response(message, session)
 
     session = await _update_state(session, reply_text, "agent")
     await update_session(session)
@@ -537,8 +539,6 @@ def _deduplicate_response(reply: str, messages: list) -> str:
 
 
 def _get_varied_response(original: str, messages: list) -> str:
-    import random
-
     varied_stalls = [
         "Ek minute sir, phone mein kuch dikkat aa rahi hai.",
         "Haan ji, main dekh raha hun, thoda time lagega.",
@@ -563,8 +563,70 @@ def _get_varied_response(original: str, messages: list) -> str:
     return random.choice(available) if available else random.choice(varied_stalls)
 
 
+def _generate_dynamic_non_scam_response(message: str, session: SessionState) -> str:
+    msg_lower = message.lower()
+    turn = session.turn_count
+
+    greetings = {"hi", "hello", "hey", "namaste", "namaskar", "assalamualaikum", "good morning", "good evening"}
+    if any(g in msg_lower for g in greetings):
+        responses = [
+            "Namaste ji! Kaun bol rahe hain?",
+            "Hello ji, haan boliye.",
+            "Haan ji, kaun hai?",
+            "Ji haan, boliye kaun?",
+            "Namaskar, aap kaun bol rahe hain?",
+            "Hello, haan ji batao.",
+        ]
+        return random.choice(responses)
+
+    identity_kw = {"kaun", "who", "kahan se", "where from", "which company", "konsi company"}
+    if any(kw in msg_lower for kw in identity_kw):
+        responses = [
+            "Ji aap kaun bol rahe hain? Mujhe nahi pata aap kaun hain.",
+            "Sorry, aapka number save nahi hai mere paas. Kaun hai?",
+            "Pehle bataiye aap kaun hain. Main kisi ko bhi apni details nahi deta.",
+            "Aap kaun hain ji? Kahan se bol rahe ho?",
+        ]
+        return random.choice(responses)
+
+    if turn <= 1:
+        first_turn = [
+            "Ji haan, boliye kya baat hai?",
+            "Haan ji, kuch kaam tha kya?",
+            "Hello ji, batao kya hua?",
+            "Ji, kaun bol rahe hain? Kuch kaam hai?",
+            "Haan ji suno.",
+        ]
+        return random.choice(first_turn)
+
+    if turn <= 3:
+        early_turn = [
+            "Accha ji, thoda detail mein batao. Samajh nahi aaya.",
+            "Haan ji main sun raha hun. Aage boliye.",
+            "Theek hai, aur batao kya karna hai?",
+            "Okay ji, continue karo. Main sun raha hun.",
+            "Haan haan, aur kya hua? Batao.",
+        ]
+        return random.choice(early_turn)
+
+    later_turn = [
+        "Accha ji, main soch kar batata hun.",
+        "Hmm, samajh gaya. Ek minute sochne do.",
+        "Theek hai ji, lekin mujhe thoda time chahiye.",
+        "Okay, main dekh raha hun. Aap thoda ruko.",
+        "Haan ji, mujhe kisi se pooch lene do pehle.",
+        "Accha accha, ek minute. Meri wife bula rahi hai.",
+    ]
+    recent_used = {
+        m.get("content", "").strip().lower()
+        for m in session.messages[-6:]
+        if m.get("role") == "agent"
+    }
+    available = [r for r in later_turn if r.lower() not in recent_used]
+    return random.choice(available) if available else random.choice(later_turn)
+
+
 async def _update_state(session: SessionState, message: str, role: str) -> SessionState:
-    from datetime import datetime, timezone
 
     session.messages.append(
         {

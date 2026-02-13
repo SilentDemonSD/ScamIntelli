@@ -125,7 +125,8 @@ async def test_score_breakdown_matches_layers(scam_message):
     result = await HybridScamDetectionEngine.detect_with_explanation(scam_message)
     expected_layers = {
         "keyword", "intent", "pattern", "emotion", "behavioral",
-        "url_threat", "multilingual", "multi_vector", "ml_model", "learned_patterns",
+        "url_threat", "multilingual", "multi_vector", "ml_model",
+        "ensemble", "learned_patterns",
     }
     actual_layers = set(result["score_breakdown"].keys())
     assert expected_layers == actual_layers

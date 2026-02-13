@@ -1,4 +1,6 @@
+import json
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
@@ -24,6 +26,8 @@ from src.scam_detector.ml_engine import MLScamDetector, PatternLearner
 from src.intelligence_extractor.network_analyzer import get_network_analyzer
 from src.intelligence_extractor.behavioral_fingerprint import get_fingerprinter
 from src.scam_detector.hybrid_engine import HybridScamDetectionEngine
+from src.scam_detector.training_pipeline import get_training_pipeline
+from src.scam_detector.data_generator import generate_training_data
 from src.security.tamper_proof import (
     TamperProofMiddleware,
     create_tamper_proof_response,
@@ -473,13 +477,9 @@ async def get_session_visualization(
             session.detection_details = explanation
             await update_session(session)
 
-    from pathlib import Path
-
     template_path = Path(__file__).parent.parent.parent / "templates" / "dashboard.html"
     if not template_path.exists():
         raise HTTPException(status_code=500, detail="Dashboard template not found")
-
-    import json
 
     html_content = template_path.read_text(encoding="utf-8")
     details_json = json.dumps(session.detection_details or {})
@@ -497,3 +497,70 @@ async def get_session_visualization(
     html_content = html_content.replace("{{SESSION_DATA}}", session_json)
 
     return HTMLResponse(content=html_content)
+
+
+@router.post("/train")
+async def train_model(
+    api_key: str = Depends(verify_api_key),
+):
+    data_path = Path("models/training_data.jsonl")
+    if not data_path.exists() or data_path.stat().st_size < 100:
+        n = generate_training_data(samples_per_category=80)
+        if n == 0:
+            raise HTTPException(status_code=500, detail="Failed to generate training data")
+
+    pipeline = get_training_pipeline()
+    try:
+        metrics = pipeline.train()
+        return {
+            "status": "success",
+            "message": "Model trained successfully",
+            "metrics": metrics.to_dict(),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Training failed: {str(e)}")
+
+
+@router.get("/model/status")
+async def model_status(
+    api_key: str = Depends(verify_api_key),
+):
+    pipeline = get_training_pipeline()
+
+    metrics = {}
+    metrics_path = Path("models/training_metrics.json")
+    if metrics_path.exists():
+        with open(metrics_path, "r") as f:
+            metrics = json.load(f)
+
+    return {
+        "status": "success",
+        "model_loaded": pipeline.is_trained,
+        "model_type": "ensemble" if pipeline.is_trained else "heuristic_fallback",
+        "training_metrics": metrics,
+    }
+
+
+@router.post("/model/predict")
+async def predict_single(
+    request: Request,
+    api_key: str = Depends(verify_api_key),
+):
+    body = await request.json()
+    text = body.get("text", "")
+    if not text:
+        raise HTTPException(status_code=400, detail="'text' field required")
+
+    pipeline = get_training_pipeline()
+    prediction = pipeline.predict(text)
+
+    return {
+        "status": "success",
+        "prediction": {
+            "is_scam": prediction.is_scam,
+            "confidence": prediction.confidence,
+            "model_used": prediction.model_used,
+            "per_model_scores": prediction.per_model_scores,
+            "feature_importance": prediction.feature_importance,
+        },
+    }

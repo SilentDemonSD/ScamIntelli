@@ -17,6 +17,7 @@ from src.scam_detector.ml_engine import (
     MLScamDetector,
     PatternLearner,
 )
+from src.scam_detector.training_pipeline import get_training_pipeline
 
 
 @dataclass(frozen=True)
@@ -138,6 +139,11 @@ class HybridScamDetectionEngine:
         scores["ml_model"] = ml_prediction.confidence
         layers_used.append(f"ml:{ml_prediction.model_used}")
 
+        ensemble_pipeline = get_training_pipeline()
+        ensemble_pred = ensemble_pipeline.predict(message)
+        scores["ensemble"] = ensemble_pred.confidence
+        layers_used.append(f"ensemble:{ensemble_pred.model_used}")
+
         pattern_score_learned = PatternLearner.get_pattern_score(message)
         scores["learned_patterns"] = pattern_score_learned
         if pattern_score_learned > 0:
@@ -145,18 +151,33 @@ class HybridScamDetectionEngine:
 
         MLScamDetector.save_training_sample(message, True if scores["keyword"] > 0.3 else False)
 
-        final_score = (
-            scores["keyword"] * 0.12
-            + scores["intent"] * 0.25
-            + scores["pattern"] * 0.12
-            + scores["emotion"] * 0.08
-            + scores["behavioral"] * 0.08
-            + scores["url_threat"] * 0.08
-            + scores["multilingual"] * 0.04
-            + scores["multi_vector"] * 0.05
-            + scores["ml_model"] * 0.12
-            + scores["learned_patterns"] * 0.06
-        )
+        if ensemble_pred.model_used == "ensemble":
+            final_score = (
+                scores["keyword"] * 0.06
+                + scores["intent"] * 0.10
+                + scores["pattern"] * 0.06
+                + scores["emotion"] * 0.05
+                + scores["behavioral"] * 0.05
+                + scores["url_threat"] * 0.06
+                + scores["multilingual"] * 0.02
+                + scores["multi_vector"] * 0.03
+                + scores["ml_model"] * 0.05
+                + scores["ensemble"] * 0.45
+                + scores["learned_patterns"] * 0.07
+            )
+        else:
+            final_score = (
+                scores["keyword"] * 0.12
+                + scores["intent"] * 0.25
+                + scores["pattern"] * 0.12
+                + scores["emotion"] * 0.08
+                + scores["behavioral"] * 0.08
+                + scores["url_threat"] * 0.08
+                + scores["multilingual"] * 0.04
+                + scores["multi_vector"] * 0.05
+                + scores["ml_model"] * 0.12
+                + scores["learned_patterns"] * 0.06
+            )
 
         has_hard = cls._has_hard_indicators(message)
 
@@ -282,21 +303,30 @@ class HybridScamDetectionEngine:
             multilingual_keywords, url_threat_score,
         )
 
+        ensemble_model_used = "heuristic_fallback"
+        ensemble_score = result.breakdown.get("ensemble", 0.0)
+        if ensemble_score > 0:
+            pipeline = get_training_pipeline()
+            ensemble_model_used = "ensemble" if pipeline.is_trained else "heuristic_fallback"
+
         advanced_features = AdvancedFeatureExtractor.extract_advanced_features(
             message, session_messages
         )
 
+        is_ensemble = ensemble_model_used == "ensemble"
+
         layer_weights = {
-            "keyword": 0.12,
-            "intent": 0.25,
-            "pattern": 0.12,
-            "emotion": 0.08,
-            "behavioral": 0.08,
-            "url_threat": 0.08,
-            "multilingual": 0.04,
-            "multi_vector": 0.05,
-            "ml_model": 0.12,
-            "learned_patterns": 0.06,
+            "keyword": 0.06 if is_ensemble else 0.12,
+            "intent": 0.10 if is_ensemble else 0.25,
+            "pattern": 0.06 if is_ensemble else 0.12,
+            "emotion": 0.05 if is_ensemble else 0.08,
+            "behavioral": 0.05 if is_ensemble else 0.08,
+            "url_threat": 0.06 if is_ensemble else 0.08,
+            "multilingual": 0.02 if is_ensemble else 0.04,
+            "multi_vector": 0.03 if is_ensemble else 0.05,
+            "ml_model": 0.05 if is_ensemble else 0.12,
+            "ensemble": 0.45 if is_ensemble else 0.0,
+            "learned_patterns": 0.07 if is_ensemble else 0.06,
         }
 
         layer_contributions = {}

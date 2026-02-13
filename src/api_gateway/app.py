@@ -80,10 +80,20 @@ async def lifespan(app: FastAPI):
 
     from src.intelligence_extractor.network_analyzer import get_network_analyzer
     from src.intelligence_extractor.behavioral_fingerprint import get_fingerprinter
+    from src.scam_detector.training_pipeline import get_training_pipeline
 
     get_network_analyzer()
     get_fingerprinter()
     logger.info("Initialized network analyzer and behavioral fingerprinter")
+
+    pipeline = get_training_pipeline()
+    if pipeline.is_trained:
+        logger.info("Ensemble model loaded and ready")
+    else:
+        logger.warning(
+            "No trained ensemble model found. "
+            "Run POST /api/v1/train or python -m src.scam_detector.train_model to train."
+        )
 
     yield
     if _cleanup_task:
