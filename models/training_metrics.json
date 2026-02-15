@@ -1,20 +1,20 @@
 {
-  "accuracy": 0.9957,
-  "precision": 0.9936,
-  "recall": 1.0,
-  "f1": 0.9968,
-  "cv_mean": 0.9989,
-  "cv_std": 0.0022,
-  "log_loss": 0.0593,
+  "accuracy": 0.9764,
+  "precision": 0.9864,
+  "recall": 0.9705,
+  "f1": 0.9784,
+  "cv_mean": 0.9672,
+  "cv_std": 0.0089,
+  "log_loss": 0.134,
   "per_model": {
-    "rf": 0.9942,
-    "gb": 0.9957,
-    "lr": 1.0,
-    "lgbm": 0.9957,
-    "xgb": 0.9914
+    "rf": 0.9307,
+    "gb": 0.9572,
+    "lr": 0.9912,
+    "lgbm": 0.9676,
+    "xgb": 0.944
   },
-  "n_samples": 3471,
+  "n_samples": 3390,
   "n_features": 545,
-  "training_time_seconds": 12.71,
-  "timestamp": "2026-02-15T11:42:17Z"
+  "training_time_seconds": 7.19,
+  "timestamp": "2026-02-15T15:53:00Z"
 }

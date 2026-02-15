@@ -34,6 +34,7 @@ async def build_callback_payload(session: SessionState) -> GuviCallbackPayload:
         upiIds=session.extracted_intel.upi_ids,
         phishingLinks=session.extracted_intel.phishing_links,
         phoneNumbers=session.extracted_intel.phone_numbers,
+        emailAddresses=session.extracted_intel.email_addresses,
         suspiciousKeywords=session.extracted_intel.suspicious_keywords,
     )
 
@@ -59,15 +60,35 @@ async def build_callback_payload(session: SessionState) -> GuviCallbackPayload:
 
     enriched_notes = notes
     if network_connections.get("connected_sessions"):
-        enriched_notes += f" | Network: {len(network_connections['connected_sessions'])} connected sessions, risk={network_connections['risk_level']}"
+        enriched_notes += (
+            f" | Network: {len(network_connections['connected_sessions'])}"
+            f" connected sessions, risk={network_connections['risk_level']}"
+        )
     if fingerprint_data and fingerprint_data["matches_found"] > 0:
-        enriched_notes += f" | Fingerprint matches: {fingerprint_data['matches_found']}"
+        enriched_notes += (
+            f" | Fingerprint matches: {fingerprint_data['matches_found']}"
+        )
+
+    duration_seconds = 0
+    if session.created_at and session.last_updated:
+        delta = session.last_updated - session.created_at
+        duration_seconds = max(int(delta.total_seconds()), 0)
+
+    scam_type = session.scam_category or "unknown"
+
+    from src.models import EngagementMetrics
 
     return GuviCallbackPayload(
+        status="success",
         sessionId=session.session_id,
         scamDetected=session.scam_detected,
+        scamType=scam_type,
         totalMessagesExchanged=session.turn_count,
         extractedIntelligence=guvi_intel,
+        engagementMetrics=EngagementMetrics(
+            engagementDurationSeconds=duration_seconds,
+            totalMessagesExchanged=session.turn_count,
+        ),
         agentNotes=enriched_notes,
     )
 

@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""
-ScamIntelli High-Concurrency Load Test
-Tests /api/v1/message and /api/v1/health endpoints
-with configurable concurrency and reports latency percentiles.
-"""
 
 import asyncio
 import json

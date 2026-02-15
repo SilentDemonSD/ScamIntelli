@@ -493,7 +493,7 @@ class TestEngagementStrategy:
         session = SessionState(
             session_id="test-intel",
             persona_style=PersonaStyle.CONFUSED,
-            turn_count=5,
+            turn_count=9,
             extracted_intel=intel,
         )
         should_continue, reason = EngagementStrategy.should_continue_engagement(

@@ -268,23 +268,8 @@ class EngagementStrategy:
             + (1 if intel.phone_numbers else 0)
         )
 
-        if intel_score >= 7 and session.turn_count >= 3:
+        if intel_score >= 7 and session.turn_count >= 8:
             return False, "sufficient_intel"
-
-        recent_msgs = (
-            session.messages[-4:] if len(session.messages) >= 4 else session.messages
-        )
-        payment_keywords = {"pay", "send", "transfer", "now", "immediately"}
-        payment_pressure = len(
-            [
-                m
-                for m in recent_msgs
-                if m.get("role") in ("user", "scammer")
-                and any(kw in m.get("content", "").lower() for kw in payment_keywords)
-            ]
-        )
-        if payment_pressure >= 3:
-            return False, "payment_pressure"
 
         return True, "continue"
 
@@ -294,6 +279,9 @@ async def process_message(
 ) -> Tuple[SessionState, AgentReply]:
     jailbreak_result = AntiJailbreakLayer.sanitize_input(message)
     if jailbreak_result.is_jailbreak:
+        session.extracted_intel = await extract_all_intelligence(
+            message, session.extracted_intel
+        )
         session = await _update_state(session, message, "scammer")
         safe_reply = ResponseObfuscator.humanize_response(
             jailbreak_result.safe_response, "confused_human", add_fillers=True
@@ -315,6 +303,9 @@ async def process_message(
     )
 
     if meta_result.is_probe and meta_result.probe_type:
+        session.extracted_intel = await extract_all_intelligence(
+            message, session.extracted_intel
+        )
         counter_response = MetaScamDetector.get_counter_response(meta_result.probe_type)
         session = await _update_state(session, message, "scammer")
         counter_response = ResponseObfuscator.humanize_response(
@@ -359,7 +350,11 @@ async def process_message(
         url_threat_score=url_threat_result.overall_threat_score,
     )
 
-    is_scam = scam_result.is_scam or hybrid_result.is_scam
+    is_scam = (
+        scam_result.is_scam
+        or hybrid_result.is_scam
+        or url_threat_result.phishing_urls_found > 0
+    )
 
     if multilingual_result.scam_keywords_multilingual:
         existing_kw = set(session.extracted_intel.suspicious_keywords)
@@ -459,7 +454,8 @@ async def process_message(
         )
 
         reply_text = await adapt_response_to_context(
-            reply_text, message, scam_cat, session.messages
+            reply_text, message, scam_cat, session.messages,
+            turn_count=session.turn_count,
         )
 
         reply_text = _deduplicate_response(reply_text, session.messages)
@@ -484,6 +480,13 @@ async def process_message(
         reply_text = get_exit_response(persona_type)
     else:
         reply_text = _generate_dynamic_non_scam_response(message, session)
+
+    if session.scam_detected and session.engagement_active:
+        intel_question = _get_intel_extraction_question(
+            session.turn_count, session.extracted_intel
+        )
+        if intel_question:
+            reply_text = f"{reply_text} {intel_question}"
 
     session = await _update_state(session, reply_text, "agent")
 
@@ -594,6 +597,49 @@ def _get_varied_response(original: str, messages: list) -> str:
     }
     available = [r for r in varied_stalls if r.lower() not in recent_used]
     return random.choice(available) if available else random.choice(varied_stalls)
+
+
+_PHONE_QUESTIONS = [
+    "btw sir aapka phone number batao, agar call drop ho jaye toh?",
+    "sir aapka contact number de do, callback karunga verification ke liye.",
+    "ek baat batao, aapka phone number kya hai? Main note kar leta hun.",
+]
+
+_UPI_QUESTIONS = [
+    "sir aapka UPI ID bhi batao, mujhe verify karna padega.",
+    "aapka UPI ID kya hai? Main payment details check karunga.",
+    "UPI se karna padega kya? UPI ID batao toh.",
+]
+
+_EMAIL_QUESTIONS = [
+    "sir aapka email ID kya hai? Main complaints cell ko bhi inform karunga.",
+    "email address de do sir, documentation ke liye chahiye.",
+    "official email bhi bhej do sir, record ke liye.",
+]
+
+
+def _get_intel_extraction_question(
+    turn_count: int, intel,
+) -> str:
+    """Returns an intelligence-extracting question at strategic turns."""
+    if turn_count == 3 and not intel.phone_numbers:
+        return random.choice(_PHONE_QUESTIONS)
+    if turn_count == 4 and not intel.upi_ids:
+        return random.choice(_UPI_QUESTIONS)
+    if turn_count == 5 and not intel.email_addresses:
+        return random.choice(_EMAIL_QUESTIONS)
+    if turn_count == 6 and not intel.phone_numbers:
+        return random.choice(_PHONE_QUESTIONS)
+    if turn_count == 7:
+        missing = []
+        if not intel.phone_numbers:
+            missing.append("phone number")
+        if not intel.upi_ids:
+            missing.append("UPI ID")
+        if missing:
+            items = " aur ".join(missing)
+            return f"sir ek last thing, aapka {items} bhi de do."
+    return ""
 
 
 def _generate_dynamic_non_scam_response(message: str, session: SessionState) -> str:

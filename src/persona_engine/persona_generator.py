@@ -7,14 +7,10 @@ from src.models import PersonaStyle, SessionState
 
 settings = get_settings()
 
-_genai_client = None
-
 
 def _get_genai_client():
-    global _genai_client
-    if _genai_client is None and settings.gemini_api_key:
-        _genai_client = genai.Client(api_key=settings.gemini_api_key)
-    return _genai_client
+    from src.persona_engine.personas import _get_genai_client as _get_shared_client
+    return _get_shared_client()
 
 
 PERSONA_RESPONSES = {

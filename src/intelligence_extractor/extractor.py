@@ -11,10 +11,21 @@ def _get_pattern(name: str) -> re.Pattern:
     if name not in _PATTERNS:
         patterns = {
             "upi": re.compile(r"[a-zA-Z0-9._\-]+@[a-zA-Z]+", re.IGNORECASE),
-            "phone": re.compile(r"(?:\+91[\s\-]?)?[6-9]\d{9}"),
-            "link": re.compile(r'https?://[^\s<>"{}|\\^`\[\]]+', re.IGNORECASE),
-            "card": re.compile(r"\b\d{4}[\s\-]?\d{4}[\s\-]?\d{4}[\s\-]?\d{4}\b"),
+            "phone": re.compile(
+                r"(?<!\d)(?:\+91[\s\-]?)?[6-9]\d{9}(?!\d)"
+                r"|(?:\+91[\s\-]?\d{4}[\s\-]?\d{3}[\s\-]?\d{3})"
+            ),
+            "link": re.compile(
+                r'https?://[^\s<>"{}|\\^`\[\]]+', re.IGNORECASE
+            ),
+            "card": re.compile(
+                r"\b\d{4}[\s\-]?\d{4}[\s\-]?\d{4}[\s\-]?\d{4}\b"
+            ),
             "account": re.compile(r"\b\d{9,18}\b"),
+            "email": re.compile(
+                r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}",
+                re.IGNORECASE,
+            ),
         }
         _PATTERNS[name] = patterns[name]
     return _PATTERNS[name]
@@ -56,18 +67,44 @@ BANK_CONTEXT_KEYWORDS: FrozenSet[str] = frozenset(
 )
 
 
-async def extract_upi_ids(message: str) -> List[str]:
+async def extract_upi_ids(message: str, known_emails: List[str] = None) -> List[str]:
+    email_set = {e.lower() for e in (known_emails or [])}
     matches = _get_pattern("upi").findall(message)
     upi_ids = []
 
     for match in matches:
+        if match.lower() in email_set:
+            continue
         parts = match.split("@")
-        if len(parts) == 2 and parts[1].lower() not in COMMON_EMAIL_DOMAINS:
-            normalized = normalize_upi_id(match)
-            if normalized and normalized not in upi_ids:
-                upi_ids.append(normalized)
+        if len(parts) != 2:
+            continue
+        domain = parts[1].lower()
+        if domain in COMMON_EMAIL_DOMAINS:
+            continue
+        if "." in domain:
+            continue
+        idx = message.find(match)
+        if idx != -1:
+            end_idx = idx + len(match)
+            if end_idx < len(message) and message[end_idx] in ("-", "."):
+                after_pos = end_idx + 1
+                if after_pos < len(message) and message[after_pos].isalnum():
+                    continue
+        normalized = normalize_upi_id(match)
+        if normalized and normalized not in upi_ids:
+            upi_ids.append(normalized)
 
     return upi_ids
+
+
+async def extract_emails(message: str) -> List[str]:
+    matches = _get_pattern("email").findall(message)
+    emails = []
+    for match in matches:
+        email_lower = match.lower().strip()
+        if email_lower not in emails:
+            emails.append(email_lower)
+    return emails
 
 
 async def extract_phone_numbers(message: str) -> List[str]:
@@ -75,6 +112,9 @@ async def extract_phone_numbers(message: str) -> List[str]:
     phone_numbers = []
 
     for match in matches:
+        original = match.strip()
+        if original and original not in phone_numbers:
+            phone_numbers.append(original)
         normalized = normalize_phone_number(match)
         if normalized and normalized not in phone_numbers:
             phone_numbers.append(normalized)
@@ -87,6 +127,7 @@ async def extract_links(message: str) -> List[str]:
     links = []
 
     for link in matches:
+        link = link.rstrip(".,;:!?)")
         link_lower = link.lower()
         if not any(domain in link_lower for domain in TRUSTED_DOMAINS):
             if link not in links:
@@ -140,7 +181,8 @@ async def extract_bank_references(
 async def extract_all_intelligence(
     message: str, existing: ExtractedIntelligence
 ) -> ExtractedIntelligence:
-    upi_ids = await extract_upi_ids(message)
+    emails = await extract_emails(message)
+    upi_ids = await extract_upi_ids(message, known_emails=emails)
     phone_numbers = await extract_phone_numbers(message)
     links = await extract_links(message)
 
@@ -156,6 +198,7 @@ async def extract_all_intelligence(
         phone_numbers=list(set(existing.phone_numbers + phone_numbers)),
         phishing_links=list(set(existing.phishing_links + links)),
         bank_accounts=list(set(existing.bank_accounts + bank_refs)),
+        email_addresses=list(set(existing.email_addresses + emails)),
         suspicious_keywords=list(set(existing.suspicious_keywords + keywords)),
     )
 

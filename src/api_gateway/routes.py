@@ -5,15 +5,17 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 
 from src.agent_controller.strategy import (
     get_engagement_summary,
     process_message,
     should_trigger_callback,
 )
+from src.agent_controller.agent_state import generate_agent_notes
 from src.callback_worker.guvi_callback import send_guvi_callback
 from src.config import get_settings
+from src.intelligence_extractor.extractor import extract_all_intelligence
 from src.models import (
     AgentReply,
     EndSessionResponse,
@@ -106,7 +108,7 @@ async def handle_message(
     return reply
 
 
-@router.post("/honeypot", response_model=HoneypotSimpleResponse)
+@router.post("/honeypot")
 async def honeypot_endpoint(
     request_body: HoneypotRequest,
     request: Request,
@@ -138,6 +140,12 @@ async def honeypot_endpoint(
         )
 
     session = await get_or_create_session(request_body.sessionId)
+
+    if request_body.conversationHistory:
+        session = await _extract_intel_from_history(
+            request_body.conversationHistory, session
+        )
+
     try:
         session, reply = await asyncio.wait_for(
             process_message(session, message_text),
@@ -151,26 +159,44 @@ async def honeypot_endpoint(
         raise HTTPException(status_code=504, detail="Request processing timed out")
     await update_session(session)
 
-    conversation_complete = not session.engagement_active or session.turn_count >= 10
+    conversation_complete = (
+        not session.engagement_active or session.turn_count >= 10
+    )
     if conversation_complete and session.scam_detected:
         await _dispatch_callback(session)
 
-    persona_type = getattr(session, "persona_type", None)
-    if persona_type is None:
-        persona_str = "default"
-    elif hasattr(persona_type, "value"):
-        persona_str = persona_type.value
-    else:
-        persona_str = str(persona_type)
+    duration_seconds = _calculate_engagement_duration(session)
+    agent_notes = await generate_agent_notes(session)
+    intel = session.extracted_intel
+    scam_type = _map_scam_type(session.scam_category, intel)
 
-    response_data, _ = create_tamper_proof_response(
-        {"status": "success", "reply": reply.reply}, persona_str
+    has_intel = (
+        intel.phone_numbers
+        or intel.bank_accounts
+        or intel.upi_ids
+        or intel.phishing_links
+        or intel.email_addresses
     )
+    scam_detected = session.scam_detected or bool(has_intel)
 
-    return HoneypotSimpleResponse(
-        status=response_data.get("status", "success"),
-        reply=response_data.get("reply", reply.reply),
-    )
+    return JSONResponse(content={
+        "status": "success",
+        "reply": reply.reply,
+        "scamDetected": scam_detected,
+        "scamType": scam_type,
+        "extractedIntelligence": {
+            "phoneNumbers": intel.phone_numbers,
+            "bankAccounts": intel.bank_accounts,
+            "upiIds": intel.upi_ids,
+            "phishingLinks": intel.phishing_links,
+            "emailAddresses": intel.email_addresses,
+        },
+        "engagementMetrics": {
+            "totalMessagesExchanged": session.turn_count,
+            "engagementDurationSeconds": duration_seconds,
+        },
+        "agentNotes": agent_notes,
+    })
 
 
 @router.get("/session/{session_id}", response_model=SessionResponse)
@@ -343,6 +369,12 @@ async def get_stats(api_key: str = Depends(verify_api_key)):
 
     ml_info = MLScamDetector.get_model_info()
 
+    analyzer = get_network_analyzer()
+    try:
+        network_stats = _compute_network_analysis(analyzer)
+    except Exception:
+        network_stats = {}
+
     return {
         "total_sessions": total_sessions,
         "active_engagements": active_engagements,
@@ -355,6 +387,7 @@ async def get_stats(api_key: str = Depends(verify_api_key)):
         "scam_categories_breakdown": scam_categories,
         "ml_model": ml_info,
         "learned_patterns": PatternLearner.get_learned_pattern_count(),
+        "network_analysis": network_stats,
         "sessions": sessions_summary,
     }
 
@@ -755,4 +788,66 @@ async def _dispatch_background_tasks(session) -> None:
             )
     except Exception as e:
         logger.debug(f"Fingerprint dispatch failed: {e}")
+
+
+def _calculate_engagement_duration(session) -> int:
+    """Calculate engagement duration in seconds from session timestamps."""
+    if not session.created_at or not session.last_updated:
+        return 0
+    delta = session.last_updated - session.created_at
+    return max(int(delta.total_seconds()), 0)
+
+
+_SCAM_TYPE_MAP = {
+    "kyc_phishing": "phishing",
+    "digital_arrest": "digital_arrest",
+    "bank_fraud": "bank_fraud",
+    "upi_fraud": "upi_fraud",
+    "phishing": "phishing",
+    "investment_fraud": "investment_fraud",
+    "job_scam": "job_scam",
+    "lottery_prize": "lottery_scam",
+    "romance_scam": "romance_scam",
+    "tech_support": "tech_support",
+    "customs_parcel": "customs_scam",
+    "loan_fraud": "loan_fraud",
+    "crypto_scam": "crypto_scam",
+    "refund_scam": "refund_scam",
+    "sextortion": "sextortion",
+}
+
+
+def _map_scam_type(
+    scam_category: str,
+    intel: "ExtractedIntelligence | None" = None,
+) -> str:
+    """Map internal scam category to evaluator-expected scam type."""
+    if intel:
+        if intel.phishing_links:
+            return "phishing"
+        if intel.upi_ids:
+            return "upi_fraud"
+        if intel.bank_accounts:
+            return "bank_fraud"
+    if not scam_category:
+        return "unknown"
+    category_lower = scam_category.lower().strip()
+    return _SCAM_TYPE_MAP.get(category_lower, category_lower)
+
+
+async def _extract_intel_from_history(
+    conversation_history: list, session,
+) -> "SessionState":
+    """Extract intelligence from evaluator-provided conversation history."""
+    for msg in conversation_history:
+        text = ""
+        if isinstance(msg, dict):
+            text = msg.get("text", "")
+        elif hasattr(msg, "text"):
+            text = msg.text or ""
+        if text:
+            session.extracted_intel = await extract_all_intelligence(
+                text, session.extracted_intel
+            )
+    return session
 

@@ -12,7 +12,6 @@ from src.config import get_settings
 from src.scam_detector.scam_types import ScamCategory
 
 settings = get_settings()
-_genai_client = None
 
 
 class LanguageStyle(str, Enum):
@@ -432,11 +431,25 @@ SCAM_PERSONA_MAPPING: Dict[ScamCategory, List[PersonaType]] = {
 }
 
 
+_genai_clients: list = []
+_genai_client_index = 0
+
+
 def _get_genai_client():
-    global _genai_client
-    if _genai_client is None and settings.gemini_api_key:
-        _genai_client = genai.Client(api_key=settings.gemini_api_key)
-    return _genai_client
+    global _genai_clients, _genai_client_index
+    if not _genai_clients:
+        keys = []
+        if settings.gemini_api_keys:
+            keys = [k.strip() for k in settings.gemini_api_keys.split(",") if k.strip()]
+        if not keys and settings.gemini_api_key:
+            keys = [settings.gemini_api_key]
+        for key in keys:
+            _genai_clients.append(genai.Client(api_key=key))
+    if not _genai_clients:
+        return None
+    client = _genai_clients[_genai_client_index % len(_genai_clients)]
+    _genai_client_index += 1
+    return client
 
 
 HINDI_PATTERNS = frozenset(
@@ -934,7 +947,7 @@ async def generate_persona_response(
     scammer_lang = detect_scammer_language(scammer_message, conversation_history)
 
     response = None
-    if settings.gemini_api_key:
+    if settings.gemini_api_key or settings.gemini_api_keys:
         with suppress(Exception):
             response = await asyncio.wait_for(
                 _generate_ai_persona_response(
@@ -1083,12 +1096,16 @@ async def adapt_response_to_context(
     scammer_message: str,
     scam_category,
     conversation_history: list = None,
+    turn_count: int = 0,
 ) -> str:
     scam_category = _ensure_scam_category(scam_category)
     scammer_lower = scammer_message.lower()
     scammer_lang = detect_scammer_language(scammer_message)
 
     is_formal = scammer_lang == LanguageStyle.FORMAL_ENGLISH
+
+    if turn_count in (3, 4, 5, 7):
+        return base_response
 
     used_responses = set()
     if conversation_history:

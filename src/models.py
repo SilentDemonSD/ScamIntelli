@@ -84,6 +84,7 @@ class ExtractedIntelligence(BaseModel):
     upi_ids: List[str] = Field(default_factory=list)
     phishing_links: List[str] = Field(default_factory=list)
     phone_numbers: List[str] = Field(default_factory=list)
+    email_addresses: List[str] = Field(default_factory=list)
     suspicious_keywords: List[str] = Field(default_factory=list)
 
 
@@ -92,6 +93,7 @@ class GuviExtractedIntelligence(BaseModel):
     upiIds: List[str] = Field(default_factory=list)
     phishingLinks: List[str] = Field(default_factory=list)
     phoneNumbers: List[str] = Field(default_factory=list)
+    emailAddresses: List[str] = Field(default_factory=list)
     suspiciousKeywords: List[str] = Field(default_factory=list)
 
 
@@ -116,10 +118,15 @@ class SessionState(BaseModel):
 
 
 class GuviCallbackPayload(BaseModel):
+    status: str = Field(default="success")
     sessionId: str
     scamDetected: bool
+    scamType: str = Field(default="unknown")
     totalMessagesExchanged: int
     extractedIntelligence: GuviExtractedIntelligence
+    engagementMetrics: EngagementMetrics = Field(
+        default_factory=EngagementMetrics
+    )
     agentNotes: str
 
 

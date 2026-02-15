@@ -15,7 +15,7 @@ def _get_pattern(key: str) -> re.Pattern:
             "phone_91": re.compile(r"^91\d{10}$"),
             "phone_10": re.compile(r"^\d{10}$"),
             "upi_valid": re.compile(r"^[a-zA-Z0-9._\-]+@[a-zA-Z]+$"),
-            "dangerous_chars": re.compile(r'[<>"\';\\]'),
+            "dangerous_chars": re.compile(r'[<>\\]'),
         }
         _PATTERN_CACHE[key] = patterns[key]
     return _PATTERN_CACHE[key]

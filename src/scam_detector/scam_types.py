@@ -6,6 +6,9 @@ from typing import Dict, List, Set, Tuple
 class ScamCategory(str, Enum):
     DIGITAL_ARREST = "digital_arrest"
     KYC_PHISHING = "kyc_phishing"
+    BANK_FRAUD = "bank_fraud"
+    UPI_FRAUD = "upi_fraud"
+    PHISHING = "phishing"
     INVESTMENT_FRAUD = "investment_fraud"
     JOB_SCAM = "job_scam"
     LOTTERY_PRIZE = "lottery_prize"
@@ -76,6 +79,58 @@ SCAM_CATEGORY_KEYWORDS: Dict[ScamCategory, Set[str]] = {
         "re-kyc",
         "ekyc",
         "video kyc",
+    },
+    ScamCategory.BANK_FRAUD: {
+        "bank account compromised",
+        "sbi account",
+        "hdfc account",
+        "icici account",
+        "account compromised",
+        "unauthorized transaction",
+        "suspicious activity",
+        "debit card blocked",
+        "credit card fraud",
+        "account will be blocked",
+        "share your account number",
+        "bank officer",
+        "bank manager",
+        "rbi notice",
+        "share otp",
+        "account number and otp",
+        "netbanking blocked",
+    },
+    ScamCategory.UPI_FRAUD: {
+        "upi verification",
+        "upi details",
+        "verify your upi",
+        "cashback",
+        "upi cashback",
+        "paytm cashback",
+        "gpay reward",
+        "phonepe cashback",
+        "upi reward",
+        "claim your reward",
+        "verify upi details",
+        "upi pin",
+        "collect request",
+        "pay to receive",
+    },
+    ScamCategory.PHISHING: {
+        "click here",
+        "claim now",
+        "exclusive offer",
+        "selected for",
+        "won a prize",
+        "limited offer",
+        "click this link",
+        "verify by clicking",
+        "claim your",
+        "offer expires",
+        "amazon deal",
+        "flipkart offer",
+        "iphone at",
+        "fake-site",
+        "malicious link",
     },
     ScamCategory.INVESTMENT_FRAUD: {
         "guaranteed returns",
@@ -259,6 +314,27 @@ SCAM_PROFILES: Dict[ScamCategory, ScamProfile] = {
         category=ScamCategory.KYC_PHISHING,
         severity=7,
         typical_tactics=("urgency", "account_threat", "link_sharing"),
+        recommended_persona="tech_naive",
+        max_engagement_turns=8,
+    ),
+    ScamCategory.BANK_FRAUD: ScamProfile(
+        category=ScamCategory.BANK_FRAUD,
+        severity=9,
+        typical_tactics=("urgency", "authority_impersonation", "fear"),
+        recommended_persona="elderly_anxious",
+        max_engagement_turns=10,
+    ),
+    ScamCategory.UPI_FRAUD: ScamProfile(
+        category=ScamCategory.UPI_FRAUD,
+        severity=7,
+        typical_tactics=("greed_exploitation", "urgency", "cashback"),
+        recommended_persona="tech_naive",
+        max_engagement_turns=10,
+    ),
+    ScamCategory.PHISHING: ScamProfile(
+        category=ScamCategory.PHISHING,
+        severity=7,
+        typical_tactics=("greed", "urgency", "link_sharing"),
         recommended_persona="tech_naive",
         max_engagement_turns=8,
     ),
