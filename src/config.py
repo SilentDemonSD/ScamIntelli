@@ -61,6 +61,9 @@ class Settings(BaseSettings):
     backpressure_shed_threshold: float = 0.9
     backpressure_slowdown_threshold: float = 0.7
 
+    request_timeout: float = 60.0
+    gemini_api_timeout: float = 25.0
+
     graph_cache_ttl: int = 300
     graph_batch_interval: int = 60
     graph_max_nodes: int = 50000

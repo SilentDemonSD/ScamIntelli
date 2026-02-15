@@ -1,3 +1,4 @@
+import asyncio
 import random
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Tuple
@@ -331,15 +332,19 @@ async def process_message(
             confidence_score=0.0,
         )
 
-    emotional_analysis = EmotionalIntelligenceEngine.analyze(
-        message, session.session_id, session.messages
-    )
+    async def _run_emotional_analysis():
+        return EmotionalIntelligenceEngine.analyze(
+            message, session.session_id, session.messages
+        )
 
-    multilingual_result = await MultiLingualDetector.analyze(
-        message, session.session_id
+    emotional_analysis, multilingual_result, url_threat_result, scam_result = (
+        await asyncio.gather(
+            _run_emotional_analysis(),
+            MultiLingualDetector.analyze(message, session.session_id),
+            MultiModalScamDetector.analyze_message(message),
+            detect_scam(message),
+        )
     )
-
-    url_threat_result = await MultiModalScamDetector.analyze_message(message)
 
     if url_threat_result.intel_extracted.get("phishing_urls"):
         existing_links = set(session.extracted_intel.phishing_links)
@@ -354,7 +359,6 @@ async def process_message(
         url_threat_score=url_threat_result.overall_threat_score,
     )
 
-    scam_result = await detect_scam(message)
     is_scam = scam_result.is_scam or hybrid_result.is_scam
 
     if multilingual_result.scam_keywords_multilingual:

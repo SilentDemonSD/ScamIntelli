@@ -538,7 +538,6 @@ class TestPersonaSelection:
 
 
 class TestLanguageDetection:
-    """Test scammer language style detection."""
 
     def test_hindi_detection(self):
         from src.persona_engine.personas import LanguageStyle, detect_scammer_language

@@ -85,7 +85,17 @@ async def handle_message(
         )
 
     session = await get_or_create_session(request_body.session_id)
-    session, reply = await process_message(session, message)
+    try:
+        session, reply = await asyncio.wait_for(
+            process_message(session, message),
+            timeout=settings.request_timeout,
+        )
+    except asyncio.TimeoutError:
+        logger.error(
+            "process_message timed out after %ss (session=%s)",
+            settings.request_timeout, request_body.session_id,
+        )
+        raise HTTPException(status_code=504, detail="Request processing timed out")
     await update_session(session)
 
     if not session.engagement_active and await should_trigger_callback(session):
@@ -128,7 +138,17 @@ async def honeypot_endpoint(
         )
 
     session = await get_or_create_session(request_body.sessionId)
-    session, reply = await process_message(session, message_text)
+    try:
+        session, reply = await asyncio.wait_for(
+            process_message(session, message_text),
+            timeout=settings.request_timeout,
+        )
+    except asyncio.TimeoutError:
+        logger.error(
+            "process_message timed out after %ss (session=%s)",
+            settings.request_timeout, request_body.sessionId,
+        )
+        raise HTTPException(status_code=504, detail="Request processing timed out")
     await update_session(session)
 
     conversation_complete = not session.engagement_active or session.turn_count >= 10

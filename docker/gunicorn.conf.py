@@ -4,15 +4,15 @@ bind = "0.0.0.0:8000"
 backlog = 2048
 
 worker_class = "uvicorn.workers.UvicornWorker"
-workers = int(os.getenv("GUNICORN_WORKERS", "2"))
+workers = int(os.getenv("GUNICORN_WORKERS", "4"))
 threads = 1
 
 max_requests = int(os.getenv("GUNICORN_MAX_REQUESTS", "2000"))
 max_requests_jitter = int(os.getenv("GUNICORN_MAX_REQUESTS_JITTER", "200"))
 
-timeout = int(os.getenv("GUNICORN_TIMEOUT", "30"))
-graceful_timeout = 15
-keepalive = int(os.getenv("GUNICORN_KEEPALIVE", "5"))
+timeout = int(os.getenv("GUNICORN_TIMEOUT", "120"))
+graceful_timeout = 30
+keepalive = int(os.getenv("GUNICORN_KEEPALIVE", "10"))
 
 proc_name = "scamintelli"
 

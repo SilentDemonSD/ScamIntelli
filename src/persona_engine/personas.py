@@ -1,3 +1,4 @@
+import asyncio
 import random
 import re
 from contextlib import suppress
@@ -935,14 +936,17 @@ async def generate_persona_response(
     response = None
     if settings.gemini_api_key:
         with suppress(Exception):
-            response = await _generate_ai_persona_response(
-                persona_type,
-                scam_category,
-                scammer_message,
-                conversation_history,
-                turn_count,
-                scammer_lang,
-                context_hint,
+            response = await asyncio.wait_for(
+                _generate_ai_persona_response(
+                    persona_type,
+                    scam_category,
+                    scammer_message,
+                    conversation_history,
+                    turn_count,
+                    scammer_lang,
+                    context_hint,
+                ),
+                timeout=settings.gemini_api_timeout,
             )
 
     if response is None:
