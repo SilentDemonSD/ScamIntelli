@@ -560,7 +560,6 @@ async def get_session_explanation(
 @router.get("/session/{session_id}/visualization")
 async def get_session_visualization(
     session_id: str,
-    api_key: str = Depends(verify_api_key),
 ):
     if not validate_session_id(session_id):
         raise HTTPException(status_code=400, detail="Invalid session ID format")
@@ -791,7 +790,6 @@ async def _dispatch_background_tasks(session) -> None:
 
 
 def _calculate_engagement_duration(session) -> int:
-    """Calculate engagement duration in seconds from session timestamps."""
     if not session.created_at or not session.last_updated:
         return 0
     delta = session.last_updated - session.created_at
@@ -821,7 +819,6 @@ def _map_scam_type(
     scam_category: str,
     intel: "ExtractedIntelligence | None" = None,
 ) -> str:
-    """Map internal scam category to evaluator-expected scam type."""
     if intel:
         if intel.phishing_links:
             return "phishing"

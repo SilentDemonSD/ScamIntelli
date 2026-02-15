@@ -31,7 +31,7 @@ class HybridDetectionResult:
 
 
 HARD_INDICATOR_PATTERNS = (
-    re.compile(r"[a-zA-Z0-9._\-]+@[a-zA-Z]+"),
+    re.compile(r"[a-zA-Z0-9._\-]+@[a-zA-Z]+(?!\.[a-zA-Z])"),
     re.compile(r"https?://\S+"),
     re.compile(r"(?:\+91[\s\-]?)?[6-9]\d{9}"),
 )
@@ -110,7 +110,7 @@ class HybridScamDetectionEngine:
         if keyword_score < 0.1 and url_threat_score < 0.2 and emotional_score < 0.2:
             return HybridDetectionResult(
                 is_scam=False,
-                confidence=0.95,
+                confidence=round(keyword_score, 4),
                 breakdown=scores,
                 has_hard_indicators=False,
                 detection_layers_used=layers_used,
@@ -166,18 +166,6 @@ class HybridScamDetectionEngine:
         scores["learned_patterns"] = pattern_score_learned
         if pattern_score_learned > 0:
             layers_used.append("learned_patterns")
-
-        # Save training sample in background — never block the hot path
-        is_likely_scam = scores["keyword"] > 0.3
-        asyncio.get_event_loop().call_soon(
-            lambda: asyncio.ensure_future(
-                asyncio.to_thread(
-                    MLScamDetector.save_training_sample,
-                    message,
-                    is_likely_scam,
-                )
-            )
-        )
 
         if ensemble_pred.model_used == "ensemble":
             final_score = (
@@ -236,6 +224,18 @@ class HybridScamDetectionEngine:
             or (url_threat_score >= 0.7 and keyword_score >= 0.2)
             or (ml_conf >= 0.85 and keyword_score >= 0.2)
         )
+
+        try:
+            loop = asyncio.get_running_loop()
+            loop.call_soon(
+                lambda msg=message, label=is_scam: asyncio.ensure_future(
+                    asyncio.to_thread(
+                        MLScamDetector.save_training_sample, msg, label,
+                    )
+                )
+            )
+        except RuntimeError:
+            pass
 
         return HybridDetectionResult(
             is_scam=is_scam,

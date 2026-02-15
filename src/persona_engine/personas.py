@@ -433,23 +433,25 @@ SCAM_PERSONA_MAPPING: Dict[ScamCategory, List[PersonaType]] = {
 
 _genai_clients: list = []
 _genai_client_index = 0
+_genai_lock = __import__("threading").Lock()
 
 
 def _get_genai_client():
     global _genai_clients, _genai_client_index
-    if not _genai_clients:
-        keys = []
-        if settings.gemini_api_keys:
-            keys = [k.strip() for k in settings.gemini_api_keys.split(",") if k.strip()]
-        if not keys and settings.gemini_api_key:
-            keys = [settings.gemini_api_key]
-        for key in keys:
-            _genai_clients.append(genai.Client(api_key=key))
-    if not _genai_clients:
-        return None
-    client = _genai_clients[_genai_client_index % len(_genai_clients)]
-    _genai_client_index += 1
-    return client
+    with _genai_lock:
+        if not _genai_clients:
+            keys = []
+            if settings.gemini_api_keys:
+                keys = [k.strip() for k in settings.gemini_api_keys.split(",") if k.strip()]
+            if not keys and settings.gemini_api_key:
+                keys = [settings.gemini_api_key]
+            for key in keys:
+                _genai_clients.append(genai.Client(api_key=key))
+        if not _genai_clients:
+            return None
+        client = _genai_clients[_genai_client_index % len(_genai_clients)]
+        _genai_client_index = (_genai_client_index + 1) % len(_genai_clients)
+        return client
 
 
 HINDI_PATTERNS = frozenset(

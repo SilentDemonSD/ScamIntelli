@@ -260,7 +260,7 @@ class Neo4jGraphStore:
         """
         edges_query = """
         MATCH (e1:Entity)-[r:CO_OCCURS]-(e2:Entity)
-        WHERE id(e1) < id(e2)
+        WHERE elementId(e1) < elementId(e2)
         RETURN e1.key AS key1, e2.key AS key2,
                r.weight AS weight, r.sessions AS sessions
         """

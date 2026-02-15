@@ -8,6 +8,9 @@ import httpx
 
 from src.config import get_settings
 from src.persona_engine.personas import HINDI_PATTERNS as ROMANIZED_HINDI_MARKERS
+from src.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class DetectedLanguage(str, Enum):
@@ -329,7 +332,7 @@ class MultiLingualDetector:
         if not source_code:
             return None
 
-        with suppress(Exception):
+        try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.post(
                     "https://api.sarvam.ai/translate",
@@ -348,6 +351,12 @@ class MultiLingualDetector:
                 if response.status_code == 200:
                     data = response.json()
                     return data.get("translated_text")
+                logger.warning(
+                    "Sarvam translation failed: status=%d, body=%s",
+                    response.status_code, response.text[:200],
+                )
+        except Exception as exc:
+            logger.warning("Sarvam translation error: %s", exc)
 
         return None
 

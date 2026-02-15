@@ -249,7 +249,7 @@ Requirements Checklist
 [ ] Final output is submitted to session log
 Self-Testing Your Endpoint
 Before submitting, you can test your API locally using the same evaluation logic we use. Below are code examples in Python and JavaScript.
-Python Self-Test Example
+
 import requests
 import uuid
 import json
@@ -370,7 +370,7 @@ def test_honeypot_api():
         except Exception as e:
             print(f"❌ ERROR: {e}")
             break
-    
+    Python Self-Test Example
     # Test final output structure
     print("\n" + "=" * 60)
     print("Now test your final output structure:")

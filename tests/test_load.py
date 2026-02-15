@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 
 import aiohttp
 
-API_BASE = "http://172.28.0.6:8000"
+API_BASE = "https://scamintelli.mysterysd.in/api/v1/honeypot"
 API_KEY = "9RnJa8XUtHjM4PgOeeoiraRG"
 
 SCAM_MESSAGES = [

@@ -13,7 +13,7 @@ def _get_pattern(name: str) -> re.Pattern:
             "upi": re.compile(r"[a-zA-Z0-9._\-]+@[a-zA-Z]+", re.IGNORECASE),
             "phone": re.compile(
                 r"(?<!\d)(?:\+91[\s\-]?)?[6-9]\d{9}(?!\d)"
-                r"|(?:\+91[\s\-]?\d{4}[\s\-]?\d{3}[\s\-]?\d{3})"
+                r"|(?:\+91[\s\-]?[6-9]\d{3}[\s\-]?\d{3}[\s\-]?\d{3})(?!\d)"
             ),
             "link": re.compile(
                 r'https?://[^\s<>"{}|\\^`\[\]]+', re.IGNORECASE

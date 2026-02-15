@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     sarvam_api_key: str = ""
     debug_mode: bool = False
 
-    redis_sentinel_enabled: bool = False
+    redis_sentinel_enabled: bool = True
     redis_sentinel_hosts: str = "sentinel-0:26379,sentinel-1:26379,sentinel-2:26379"
     redis_sentinel_master: str = "scamintelli-master"
     redis_password: str = ""

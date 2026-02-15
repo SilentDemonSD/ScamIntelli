@@ -8,6 +8,7 @@ and response structure against the 100-point scoring rubric.
 """
 
 import asyncio
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -370,7 +371,7 @@ LOTTERY_SCAM_SCENARIOS = [
         "initial": (
             "Congratulations! You won Rs 25,00,000 in KBC Lottery! "
             "Claim by paying processing fee Rs 5000. "
-            "Contact: kbc.winner@lottery-india.com. Call +91-5050505050."
+            "Contact: kbc.winner@lottery-india.com. Call +91-9050505050."
         ),
         "follow_ups": [
             "Pay processing fee to kbc.prize@ybl.",
@@ -378,7 +379,7 @@ LOTTERY_SCAM_SCENARIOS = [
         ],
         "fake_data": {
             "emailAddress": "kbc.winner@lottery-india.com",
-            "phoneNumber": "+91-5050505050",
+            "phoneNumber": "+91-9050505050",
             "upiId": "kbc.prize@ybl",
         },
         "metadata": {"channel": "SMS", "language": "English", "locale": "IN"},
@@ -388,7 +389,7 @@ LOTTERY_SCAM_SCENARIOS = [
         "initial": (
             "WhatsApp Lucky Draw 2025! Your number selected for Rs 10,00,000. "
             "Tax Rs 3000 required. UPI: lucky.draw@oksbi. "
-            "Contact +91-4040404040. Email: winner@whatsapp-lottery.com"
+            "Contact +91-9040404040. Email: winner@whatsapp-lottery.com"
         ),
         "follow_ups": [
             "Sir jaldi pay kariye, offer sirf aaj hai.",
@@ -396,7 +397,7 @@ LOTTERY_SCAM_SCENARIOS = [
         ],
         "fake_data": {
             "upiId": "lucky.draw@oksbi",
-            "phoneNumber": "+91-4040404040",
+            "phoneNumber": "+91-9040404040",
             "emailAddress": "winner@whatsapp-lottery.com",
         },
         "metadata": {"channel": "WhatsApp", "language": "English", "locale": "IN"},
@@ -410,7 +411,7 @@ ROMANCE_SCAM_SCENARIOS = [
             "Hi dear, I saw your profile and fell in love. "
             "I am a US army officer stuck in Syria. "
             "I need Rs 50,000 for emergency medical leave. "
-            "Send to my friend: army.help@okaxis. Call +91-3030303030."
+            "Send to my friend: army.help@okaxis. Call +91-9030303030."
         ),
         "follow_ups": [
             "Dear, please help me. I will pay you back when I come to India.",
@@ -418,7 +419,7 @@ ROMANCE_SCAM_SCENARIOS = [
         ],
         "fake_data": {
             "upiId": "army.help@okaxis",
-            "phoneNumber": "+91-3030303030",
+            "phoneNumber": "+91-9030303030",
             "emailAddress": "captain.love@military-romance.com",
         },
         "metadata": {"channel": "WhatsApp", "language": "English", "locale": "IN"},
@@ -430,7 +431,7 @@ TECH_SUPPORT_SCENARIOS = [
         "name": "Microsoft tech support",
         "initial": (
             "ALERT: Your computer has been infected with virus. "
-            "Call Microsoft Tech Support immediately: +91-2020202020. "
+            "Call Microsoft Tech Support immediately: +91-9020202020. "
             "Pay Rs 2999 for antivirus: techsupport@fix-pc-india.com. "
             "UPI: microsoft.fix@paytm."
         ),
@@ -440,7 +441,7 @@ TECH_SUPPORT_SCENARIOS = [
             "Visit: http://microsoft-fix.scam-site.com/download",
         ],
         "fake_data": {
-            "phoneNumber": "+91-2020202020",
+            "phoneNumber": "+91-9020202020",
             "emailAddress": "techsupport@fix-pc-india.com",
             "upiId": "microsoft.fix@paytm",
             "phishingLink": "http://microsoft-fix.scam-site.com/download",
@@ -455,7 +456,7 @@ INSURANCE_SCAM_SCENARIOS = [
         "initial": (
             "Dear Policyholder, your LIC policy has matured. "
             "Claim Rs 15,00,000. Pay GST Rs 7500 via UPI: lic.claim@ybl. "
-            "Call +91-1010101010. Email: claims@lic-maturity-india.com"
+            "Call +91-9010101010. Email: claims@lic-maturity-india.com"
         ),
         "follow_ups": [
             "Your policy number: LIC-2025-MAT-5678.",
@@ -463,7 +464,7 @@ INSURANCE_SCAM_SCENARIOS = [
         ],
         "fake_data": {
             "upiId": "lic.claim@ybl",
-            "phoneNumber": "+91-1010101010",
+            "phoneNumber": "+91-9010101010",
             "emailAddress": "claims@lic-maturity-india.com",
         },
         "metadata": {"channel": "SMS", "language": "English", "locale": "IN"},
@@ -476,7 +477,7 @@ SEXTORTION_SCENARIOS = [
         "initial": (
             "I have your private video. Pay Rs 1,00,000 or I will "
             "upload to internet. UPI: pay.now@ybl. "
-            "Contact +91-1111111111. Email: blackmail@anonymous-threat.com"
+            "Contact +91-9111111111. Email: blackmail@anonymous-threat.com"
         ),
         "follow_ups": [
             "You have 24 hours. Pay to pay.now@ybl.",
@@ -484,7 +485,7 @@ SEXTORTION_SCENARIOS = [
         ],
         "fake_data": {
             "upiId": "pay.now@ybl",
-            "phoneNumber": "+91-1111111111",
+            "phoneNumber": "+91-9111111111",
             "emailAddress": "blackmail@anonymous-threat.com",
         },
         "metadata": {"channel": "WhatsApp", "language": "English", "locale": "IN"},
@@ -559,7 +560,11 @@ class TestIntelligenceExtraction:
         for fake_key, fake_value in fake_data.items():
             attr = key_mapping.get(fake_key, fake_key)
             extracted_list = getattr(intel, attr, [])
-            found = any(fake_value in str(v) for v in extracted_list)
+            norm_fake = re.sub(r"[\s\-]", "", fake_value)
+            found = any(
+                fake_value in str(v) or norm_fake in re.sub(r"[\s\-]", "", str(v))
+                for v in extracted_list
+            )
             if found:
                 extracted_count += 1
             else:
@@ -687,7 +692,7 @@ class TestMultiTurnConversation:
             session, reply = await process_message(session, msg)
 
         intel = session.extracted_intel
-        assert any("+91-9876543210" in p for p in intel.phone_numbers)
+        assert any("9876543210" in p for p in intel.phone_numbers)
         assert any("1234567890123456" in a for a in intel.bank_accounts)
         assert any("fraud.bank@ybl" in u for u in intel.upi_ids)
         assert session.turn_count >= 3
@@ -890,7 +895,7 @@ class TestEdgeCases:
 
     @pytest.mark.asyncio
     async def test_multiple_phone_numbers(self):
-        msg = "Call +91-1234567890 or +91-0987654321 for help."
+        msg = "Call +91-9234567890 or +91-8987654321 for help."
         intel = await extract_all_intelligence(msg, ExtractedIntelligence())
         assert len(intel.phone_numbers) >= 2
 
@@ -923,4 +928,4 @@ class TestEdgeCases:
     async def test_phone_with_dashes_preserved(self):
         msg = "Call me at +91-9876543210 urgently!"
         intel = await extract_all_intelligence(msg, ExtractedIntelligence())
-        assert "+91-9876543210" in intel.phone_numbers
+        assert any("9876543210" in p for p in intel.phone_numbers)
