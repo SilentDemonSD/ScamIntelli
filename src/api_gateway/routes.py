@@ -78,8 +78,11 @@ async def handle_message(
         validate_incoming_request(
             ip, user_agent, request_body.session_id, message, headers
         )
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning(
+            "Request validation flagged: %s (session=%s, ip=%s)",
+            exc, request_body.session_id, ip,
+        )
 
     session = await get_or_create_session(request_body.session_id)
     session, reply = await process_message(session, message)
@@ -118,8 +121,11 @@ async def honeypot_endpoint(
         validate_incoming_request(
             ip, user_agent, request_body.sessionId, message_text, headers
         )
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning(
+            "Honeypot validation flagged: %s (session=%s, ip=%s)",
+            exc, request_body.sessionId, ip,
+        )
 
     session = await get_or_create_session(request_body.sessionId)
     session, reply = await process_message(session, message_text)
@@ -529,7 +535,9 @@ async def get_session_visualization(
     if not template_path.exists():
         raise HTTPException(status_code=500, detail="Dashboard template not found")
 
-    html_content = template_path.read_text(encoding="utf-8")
+    html_content = await asyncio.to_thread(
+        template_path.read_text, "utf-8"
+    )
     details_json = json.dumps(session.detection_details or {})
     session_json = json.dumps({
         "session_id": session.session_id,
@@ -541,15 +549,21 @@ async def get_session_visualization(
         "engagement_active": session.engagement_active,
     })
 
-    # URL-encode for safe embedding in JS (avoids single-quote/backslash issues)
+    def _html_safe_json(raw: str) -> str:
+        return raw.replace("</", "<\\/").replace("<!--", "<\\!--")
+
     import urllib.parse
     details_encoded = urllib.parse.quote(details_json, safe='')
     session_encoded = urllib.parse.quote(session_json, safe='')
 
     html_content = html_content.replace("{{DETECTION_DETAILS_ENCODED}}", details_encoded)
     html_content = html_content.replace("{{SESSION_DATA_ENCODED}}", session_encoded)
-    html_content = html_content.replace("{{DETECTION_DETAILS}}", details_json)
-    html_content = html_content.replace("{{SESSION_DATA}}", session_json)
+    html_content = html_content.replace(
+        "{{DETECTION_DETAILS}}", _html_safe_json(details_json)
+    )
+    html_content = html_content.replace(
+        "{{SESSION_DATA}}", _html_safe_json(session_json)
+    )
 
     return HTMLResponse(content=html_content)
 

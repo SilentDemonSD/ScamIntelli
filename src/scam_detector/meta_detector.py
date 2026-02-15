@@ -1,8 +1,11 @@
 import random
 import time
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, FrozenSet, List, Optional, Tuple
+
+_MAX_SESSION_HISTORIES = 2000
 
 
 class ProbeType(str, Enum):
@@ -181,17 +184,27 @@ COUNTER_RESPONSES = {
 
 
 class MetaScamDetector:
-    _session_histories: Dict[str, SessionProbeHistory] = {}
+    _session_histories: OrderedDict = OrderedDict()
 
     @classmethod
     def reset(cls):
         cls._session_histories.clear()
 
     @classmethod
+    def cleanup_session(cls, session_id: str) -> None:
+        cls._session_histories.pop(session_id, None)
+
+    @classmethod
     def _get_session_history(cls, session_id: str) -> SessionProbeHistory:
-        if session_id not in cls._session_histories:
-            cls._session_histories[session_id] = SessionProbeHistory()
-        return cls._session_histories[session_id]
+        if session_id in cls._session_histories:
+            cls._session_histories.move_to_end(session_id)
+            return cls._session_histories[session_id]
+        # Evict oldest entries when at capacity
+        while len(cls._session_histories) >= _MAX_SESSION_HISTORIES:
+            cls._session_histories.popitem(last=False)
+        history = SessionProbeHistory()
+        cls._session_histories[session_id] = history
+        return history
 
     @classmethod
     def analyze(

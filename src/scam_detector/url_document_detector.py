@@ -311,24 +311,34 @@ class URLThreatAnalyzer:
 
 class MultiModalScamDetector:
 
+    _MAX_URLS_PER_MESSAGE = 10
+
     @classmethod
     async def analyze_message(cls, message: str) -> DocumentThreatResult:
-        urls = URLThreatAnalyzer.extract_urls(message)
+        urls = URLThreatAnalyzer.extract_urls(message)[:cls._MAX_URLS_PER_MESSAGE]
         threats = []
         suspicious_domains = []
         intel = {"phishing_urls": [], "expanded_urls": [], "suspicious_domains": []}
 
-        for url in urls:
-            result = await URLThreatAnalyzer.analyze_url(url)
-            if result.threat_score >= 0.3:
-                threats.append(result)
-                domain = URLThreatAnalyzer.extract_domain(url)
-                if domain:
-                    suspicious_domains.append(domain)
-                    intel["suspicious_domains"].append(domain)
-                intel["phishing_urls"].append(url)
-                if result.expanded_url:
-                    intel["expanded_urls"].append(result.expanded_url)
+        if urls:
+            # Analyze all URLs concurrently instead of sequentially
+            import asyncio
+            results = await asyncio.gather(
+                *(URLThreatAnalyzer.analyze_url(url) for url in urls),
+                return_exceptions=True,
+            )
+            for url, result in zip(urls, results):
+                if isinstance(result, Exception):
+                    continue
+                if result.threat_score >= 0.3:
+                    threats.append(result)
+                    domain = URLThreatAnalyzer.extract_domain(url)
+                    if domain:
+                        suspicious_domains.append(domain)
+                        intel["suspicious_domains"].append(domain)
+                    intel["phishing_urls"].append(url)
+                    if result.expanded_url:
+                        intel["expanded_urls"].append(result.expanded_url)
 
         overall = max((t.threat_score for t in threats), default=0.0)
 

@@ -1,3 +1,4 @@
+from functools import lru_cache
 from typing import Dict, FrozenSet
 
 URGENCY_KEYWORDS: FrozenSet[str] = frozenset(
@@ -373,6 +374,7 @@ INDIA_SPECIFIC_PATTERNS: FrozenSet[str] = frozenset(
 )
 
 
+@lru_cache(maxsize=1)
 def get_all_scam_keywords() -> FrozenSet[str]:
     return (
         URGENCY_KEYWORDS
@@ -394,6 +396,7 @@ def get_all_scam_keywords() -> FrozenSet[str]:
     )
 
 
+@lru_cache(maxsize=1)
 def get_keyword_categories() -> Dict[str, FrozenSet[str]]:
     return {
         "urgency": URGENCY_KEYWORDS,
@@ -415,6 +418,7 @@ def get_keyword_categories() -> Dict[str, FrozenSet[str]]:
     }
 
 
+@lru_cache(maxsize=1)
 def get_high_severity_keywords() -> FrozenSet[str]:
     return DIGITAL_ARREST_KEYWORDS | SEXTORTION_KEYWORDS | CREDENTIAL_KEYWORDS | PRIZE_LOTTERY_KEYWORDS
 

@@ -363,6 +363,12 @@ class AdvancedFeatureExtractor:
     _PASSIVE_PATTERN = re.compile(
         r"\b(is|are|was|were|been|being)\s+\w+ed\b", re.IGNORECASE
     )
+    _URL_PATTERN = re.compile(r"https?://\S+")
+    _PHONE_PATTERN = re.compile(r"(?:\+91[\s\-]?)?[6-9]\d{9}")
+    _EMAIL_PATTERN = re.compile(
+        r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}"
+    )
+    _UPI_PATTERN = re.compile(r"[a-zA-Z0-9._\-]+@[a-zA-Z]+")
     _IMPERATIVE_STARTERS = frozenset(
         {
             "click", "send", "share", "verify", "confirm", "pay", "transfer",
@@ -659,24 +665,18 @@ class AdvancedFeatureExtractor:
         words: List[str],
         word_count: int,
     ) -> None:
-        phone_pattern = re.compile(r"(?:\+91[\s\-]?)?[6-9]\d{9}")
-        upi_pattern = re.compile(r"[a-zA-Z0-9._\-]+@[a-zA-Z]+")
-        url_pattern = re.compile(r"https?://\S+")
-        email_pattern = re.compile(
-            r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}"
-        )
-
+        # Reuse pre-compiled class-level patterns instead of recompiling
         features["info_unique_phone_count"] = float(
-            min(len(set(phone_pattern.findall(message))) / 3.0, 1.0)
+            min(len(set(cls._PHONE_PATTERN.findall(message))) / 3.0, 1.0)
         )
         features["info_unique_upi_count"] = float(
-            min(len(set(upi_pattern.findall(message))) / 3.0, 1.0)
+            min(len(set(cls._UPI_PATTERN.findall(message))) / 3.0, 1.0)
         )
         features["info_unique_url_count"] = float(
-            min(len(set(url_pattern.findall(message))) / 3.0, 1.0)
+            min(len(set(cls._URL_PATTERN.findall(message))) / 3.0, 1.0)
         )
         features["info_unique_email_count"] = float(
-            min(len(set(email_pattern.findall(message))) / 2.0, 1.0)
+            min(len(set(cls._EMAIL_PATTERN.findall(message))) / 2.0, 1.0)
         )
 
         amounts = cls._AMOUNT_PATTERN.findall(message)

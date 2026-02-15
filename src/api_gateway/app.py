@@ -26,6 +26,9 @@ GENERIC_ERRORS = [
 ]
 
 
+_MAX_RATE_LIMITER_CLIENTS = 10000
+
+
 class RateLimiter:
     def __init__(self, requests_per_minute: int = 60):
         self._requests: Dict[str, list] = defaultdict(list)
@@ -54,6 +57,15 @@ class RateLimiter:
             ]
             for k in expired:
                 del self._requests[k]
+            # Cap total tracked clients to prevent memory growth
+            if len(self._requests) > _MAX_RATE_LIMITER_CLIENTS:
+                overflow = len(self._requests) - _MAX_RATE_LIMITER_CLIENTS
+                for _ in range(overflow):
+                    oldest = min(
+                        self._requests,
+                        key=lambda k: max(self._requests[k]) if self._requests[k] else 0,
+                    )
+                    del self._requests[oldest]
 
 
 rate_limiter = RateLimiter(settings.rate_limit_per_minute)
@@ -77,15 +89,15 @@ async def periodic_cleanup():
                 if lock_mgr:
                     active = await store.get_active_session_ids()
                     await lock_mgr.cleanup_stale(active)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Session/lock cleanup failed: %s", exc)
 
         try:
             from src.graph.graph_backend import get_graph_cache
             cache = get_graph_cache()
             await cache.cleanup_expired()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Graph cache cleanup failed: %s", exc)
 
 
 async def _init_task_queue():
@@ -198,7 +210,11 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://scamintelli.mysterysd.in",
+        "http://localhost:3000",
+        "http://localhost:8000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -15,6 +15,9 @@ class RequestFingerprint:
     is_suspicious: bool
 
 
+_MAX_REQUEST_HISTORY = 5000
+
+
 class TamperProofMiddleware:
     _instance = None
     _request_history: Dict[str, list] = {}
@@ -108,6 +111,15 @@ class TamperProofMiddleware:
 
     def analyze_request_pattern(self, client_hash: str, current_time: float) -> bool:
         if client_hash not in self._request_history:
+            # Evict oldest entries when at capacity
+            if len(self._request_history) >= _MAX_REQUEST_HISTORY:
+                oldest_key = min(
+                    self._request_history,
+                    key=lambda k: max(self._request_history[k])
+                    if self._request_history[k]
+                    else 0,
+                )
+                del self._request_history[oldest_key]
             self._request_history[client_hash] = []
 
         history = self._request_history[client_hash]

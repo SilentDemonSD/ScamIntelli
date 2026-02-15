@@ -1,4 +1,5 @@
 import re
+from functools import lru_cache
 from typing import List, Tuple
 
 from src.config import get_settings
@@ -19,6 +20,26 @@ from src.scam_detector.keywords import (
 settings = get_settings()
 _COMPILED_PATTERNS = {}
 
+# Short keywords that need word-boundary matching to avoid false positives
+_SHORT_KEYWORD_THRESHOLD = 5
+
+
+@lru_cache(maxsize=4096)
+def _word_boundary_pattern(keyword: str) -> re.Pattern:
+    return re.compile(r"\b" + re.escape(keyword) + r"\b", re.IGNORECASE)
+
+
+def _keyword_in_message(keyword: str, message_lower: str) -> bool:
+    if len(keyword) <= _SHORT_KEYWORD_THRESHOLD:
+        return bool(_word_boundary_pattern(keyword).search(message_lower))
+    return keyword in message_lower
+
+
+def _count_keyword_matches(
+    keywords: frozenset, message_lower: str
+) -> int:
+    return sum(1 for kw in keywords if _keyword_in_message(kw, message_lower))
+
 
 def _get_phone_pattern():
     if "phone" not in _COMPILED_PATTERNS:
@@ -29,7 +50,9 @@ def _get_phone_pattern():
 async def calculate_keyword_score(message: str) -> Tuple[float, List[str]]:
     message_lower = message.lower()
     all_keywords = get_all_scam_keywords()
-    matched_keywords = [kw for kw in all_keywords if kw in message_lower]
+    matched_keywords = [
+        kw for kw in all_keywords if _keyword_in_message(kw, message_lower)
+    ]
 
     if not matched_keywords:
         return 0.0, []
@@ -45,7 +68,7 @@ async def calculate_keyword_score(message: str) -> Tuple[float, List[str]]:
     category_severity_total = 0
 
     for category, keywords in categories.items():
-        if any(kw in message_lower for kw in keywords):
+        if any(_keyword_in_message(kw, message_lower) for kw in keywords):
             matched_categories.add(category)
             category_severity_total += severity_map.get(category, 3)
 
@@ -60,27 +83,29 @@ async def calculate_intent_score(message: str) -> float:
     message_lower = message.lower()
     score = 0.0
 
-    digital_arrest_count = sum(1 for k in DIGITAL_ARREST_KEYWORDS if k in message_lower)
+    digital_arrest_count = _count_keyword_matches(
+        DIGITAL_ARREST_KEYWORDS, message_lower
+    )
     if digital_arrest_count > 0:
         score += min(digital_arrest_count * 0.4, 0.8)
 
-    threat_count = sum(1 for k in THREAT_KEYWORDS if k in message_lower)
+    threat_count = _count_keyword_matches(THREAT_KEYWORDS, message_lower)
     if threat_count > 0:
         score += min(threat_count * 0.25, 0.5)
 
-    urgency_count = sum(1 for k in URGENCY_KEYWORDS if k in message_lower)
+    urgency_count = _count_keyword_matches(URGENCY_KEYWORDS, message_lower)
     if urgency_count > 0:
         score += min(urgency_count * 0.15, 0.3)
 
-    credential_count = sum(1 for k in CREDENTIAL_KEYWORDS if k in message_lower)
+    credential_count = _count_keyword_matches(CREDENTIAL_KEYWORDS, message_lower)
     if credential_count > 0:
         score += min(credential_count * 0.3, 0.6)
 
-    payment_count = sum(1 for k in PAYMENT_KEYWORDS if k in message_lower)
+    payment_count = _count_keyword_matches(PAYMENT_KEYWORDS, message_lower)
     if payment_count > 0:
         score += min(payment_count * 0.2, 0.4)
 
-    prize_count = sum(1 for k in PRIZE_LOTTERY_KEYWORDS if k in message_lower)
+    prize_count = _count_keyword_matches(PRIZE_LOTTERY_KEYWORDS, message_lower)
     if prize_count > 0:
         score += min(prize_count * 0.25, 0.6)
 

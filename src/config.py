@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     response_delay_max: float = 2.5
     enable_tamper_protection: bool = True
     max_concurrent_sessions: int = 1000
-    rate_limit_per_minute: int = 60
+    rate_limit_per_minute: int = 300
     sarvam_api_key: str = ""
     debug_mode: bool = False
 

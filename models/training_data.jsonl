@@ -3469,3 +3469,20 @@
 {"text": "Just transferred 5000 to mom's account for groceries! Normal family transfer!", "label": 0, "scam_category": "none_adversarial"}
 {"text": "Dude Got my income tax refund today! 8000 rupees credited normally to bank account.", "label": 0, "scam_category": "none_adversarial"}
 {"text": "Bank 5 legitimate loan approve ho gaya. se lakh personal loan at 10.5%.", "label": 0, "scam_category": "none_adversarial"}
+{"message": "Urgent! Share OTP now or your account will be blocked! Send immediately!", "is_scam": true, "timestamp": "2026-02-15T13:31:32.247751+00:00"}
+{"message": "Your account is under investigation. I am calling from CBI.", "is_scam": true, "timestamp": "2026-02-15T13:31:32.622867+00:00"}
+{"message": "Share your OTP immediately for verification!", "is_scam": true, "timestamp": "2026-02-15T13:31:32.835282+00:00"}
+{"message": "If you don't cooperate, arrest warrant will be issued!", "is_scam": true, "timestamp": "2026-02-15T13:31:33.276979+00:00"}
+{"message": "Send money to test@ybl immediately or face arrest! Call 9876543210 now!", "is_scam": true, "timestamp": "2026-02-15T13:31:34.076814+00:00"}
+{"message": "Urgent! Your account suspended! Send OTP immediately or arrest warrant issued!", "is_scam": true, "timestamp": "2026-02-15T13:31:35.852800+00:00"}
+{"message": "Send OTP now or account blocked!", "is_scam": true, "timestamp": "2026-02-15T13:31:36.949448+00:00"}
+{"message": "Send OTP now! Your account is suspended!", "is_scam": true, "timestamp": "2026-02-15T13:31:39.721892+00:00"}
+{"message": "This is Inspector Sharma from CBI. Your Aadhaar has been used in money laundering. Arrest warrant issued. Cooperate or face jail!", "is_scam": true, "timestamp": "2026-02-15T13:31:40.867337+00:00"}
+{"message": "Dear customer, your bank account KYC is expired. Click here to verify: https://fake-bank.xyz/kyc or account will be blocked.", "is_scam": true, "timestamp": "2026-02-15T13:31:41.311843+00:00"}
+{"message": "Congratulations! You are selected for work from home job. Salary 50000 per month. Pay 2000 registration fee to start immediately!", "is_scam": true, "timestamp": "2026-02-15T13:31:42.288227+00:00"}
+{"message": "Guaranteed 300% returns on investment! Invest 10000 now via UPI invest@ybl. Limited time offer, act now! Already 10000 members earning daily!", "is_scam": true, "timestamp": "2026-02-15T13:31:43.248949+00:00"}
+{"message": "Sir aapke account mein unauthorized transaction detected hai. Please OTP share kariye turant verification ke liye. OTP bhejo jaldi!", "is_scam": true, "timestamp": "2026-02-15T13:31:44.277992+00:00"}
+{"message": "Payment receive karne ke liye QR code scan karo. Scan karke amount enter karo, paisa aa jaayega.", "is_scam": true, "timestamp": "2026-02-15T13:31:45.232142+00:00"}
+{"message": "Jaldi karo, turant OTP bhejo warna account block ho jaayega! Police aa rahi hai arrest ke liye!", "is_scam": true, "timestamp": "2026-02-15T13:31:46.975486+00:00"}
+{"message": "Click this link https://malicious.xyz and enter your OTP. Call us at 9876543210 or money will be deducted from your account!", "is_scam": true, "timestamp": "2026-02-15T13:31:47.991033+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T13:31:50.097774+00:00"}

@@ -912,7 +912,7 @@ def select_persona_for_scam(scam_category, turn_count: int = 0) -> PersonaType:
     candidates = SCAM_PERSONA_MAPPING.get(
         scam_category, SCAM_PERSONA_MAPPING[ScamCategory.UNKNOWN]
     )
-    return candidates[0] if turn_count <= 2 else random.choice(candidates)
+    return random.choice(candidates)
 
 
 def get_persona_profile(persona_type) -> PersonaProfile:

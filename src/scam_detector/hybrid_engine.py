@@ -1,3 +1,4 @@
+import asyncio
 import re
 from dataclasses import dataclass
 from typing import Any, Dict, FrozenSet, List
@@ -155,7 +156,9 @@ class HybridScamDetectionEngine:
         layers_used.append(f"ml:{ml_prediction.model_used}")
 
         ensemble_pipeline = get_training_pipeline()
-        ensemble_pred = ensemble_pipeline.predict(message)
+        ensemble_pred = await asyncio.to_thread(
+            ensemble_pipeline.predict, message
+        )
         scores["ensemble"] = ensemble_pred.confidence
         layers_used.append(f"ensemble:{ensemble_pred.model_used}")
 
@@ -164,7 +167,17 @@ class HybridScamDetectionEngine:
         if pattern_score_learned > 0:
             layers_used.append("learned_patterns")
 
-        MLScamDetector.save_training_sample(message, True if scores["keyword"] > 0.3 else False)
+        # Save training sample in background — never block the hot path
+        is_likely_scam = scores["keyword"] > 0.3
+        asyncio.get_event_loop().call_soon(
+            lambda: asyncio.ensure_future(
+                asyncio.to_thread(
+                    MLScamDetector.save_training_sample,
+                    message,
+                    is_likely_scam,
+                )
+            )
+        )
 
         if ensemble_pred.model_used == "ensemble":
             final_score = (

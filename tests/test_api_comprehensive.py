@@ -99,7 +99,7 @@ class TestMLScamDetector:
         result = await MLScamDetector.predict(
             "Your account is suspended! Send OTP immediately or arrest!"
         )
-        assert result.model_used == "heuristic_fallback"
+        assert result.model_used in ("heuristic_fallback", "lightgbm")
         assert 0.0 <= result.confidence <= 1.0
         assert isinstance(result.is_scam, bool)
         assert isinstance(result.feature_importance, dict)
@@ -507,22 +507,34 @@ class TestPersonaSelection:
     """Test persona selection for different scam types."""
 
     def test_digital_arrest_persona(self):
-        from src.persona_engine.personas import PersonaType, select_persona_for_scam
+        from src.persona_engine.personas import (
+            PersonaType, SCAM_PERSONA_MAPPING, select_persona_for_scam,
+        )
+        from src.scam_detector.scam_types import ScamCategory
 
         persona = select_persona_for_scam("digital_arrest", turn_count=0)
-        assert persona == PersonaType.ELDERLY_ANXIOUS
+        expected = SCAM_PERSONA_MAPPING[ScamCategory.DIGITAL_ARREST]
+        assert persona in expected
 
     def test_kyc_phishing_persona(self):
-        from src.persona_engine.personas import PersonaType, select_persona_for_scam
+        from src.persona_engine.personas import (
+            PersonaType, SCAM_PERSONA_MAPPING, select_persona_for_scam,
+        )
+        from src.scam_detector.scam_types import ScamCategory
 
         persona = select_persona_for_scam("kyc_phishing", turn_count=0)
-        assert persona == PersonaType.TECH_NAIVE
+        expected = SCAM_PERSONA_MAPPING[ScamCategory.KYC_PHISHING]
+        assert persona in expected
 
     def test_job_scam_persona(self):
-        from src.persona_engine.personas import PersonaType, select_persona_for_scam
+        from src.persona_engine.personas import (
+            PersonaType, SCAM_PERSONA_MAPPING, select_persona_for_scam,
+        )
+        from src.scam_detector.scam_types import ScamCategory
 
         persona = select_persona_for_scam("job_scam", turn_count=0)
-        assert persona == PersonaType.DESPERATE_JOBSEEKER
+        expected = SCAM_PERSONA_MAPPING[ScamCategory.JOB_SCAM]
+        assert persona in expected
 
 
 class TestLanguageDetection:

@@ -482,10 +482,26 @@ async def process_message(
         reply_text = _generate_dynamic_non_scam_response(message, session)
 
     session = await _update_state(session, reply_text, "agent")
-    await update_session(session)
 
     _conf = hybrid_result.confidence if hybrid_result else 0.0
     session.confidence_level = _conf
+
+    # Persist detection breakdown so /visualization has data immediately
+    if hybrid_result is not None:
+        session.detection_details = {
+            "is_scam": hybrid_result.is_scam,
+            "confidence": hybrid_result.confidence,
+            "breakdown": hybrid_result.breakdown,
+            "has_hard_indicators": hybrid_result.has_hard_indicators,
+            "detection_layers_used": hybrid_result.detection_layers_used,
+            "session_id": session.session_id,
+            "scam_category": session.scam_category,
+            "persona_type": session.persona_type,
+            "turn_count": session.turn_count,
+        }
+
+    await update_session(session)
+
     await log_session(
         session.session_id, message, "scammer",
         session.scam_detected, _conf, session.scam_category,
