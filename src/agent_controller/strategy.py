@@ -35,6 +35,7 @@ from src.scam_detector.url_document_detector import MultiModalScamDetector
 from src.security.jailbreak_guard import AntiJailbreakLayer
 from src.security.tamper_proof import ResponseObfuscator
 from src.session_manager.session_store import update_session
+from src.utils.logging import log_session
 
 settings = get_settings()
 
@@ -298,12 +299,14 @@ async def process_message(
         )
         session = await _update_state(session, safe_reply, "agent")
         await update_session(session)
+        await log_session(session.session_id, message, "scammer", session.scam_detected, 0.0, session.scam_category)
         return session, AgentReply(
             status="success",
             reply=safe_reply,
             session_id=session.session_id,
             scam_detected=session.scam_detected,
             engagement_active=session.engagement_active,
+            confidence_score=0.0,
         )
 
     meta_result = MetaScamDetector.analyze(
@@ -318,12 +321,14 @@ async def process_message(
         )
         session = await _update_state(session, counter_response, "agent")
         await update_session(session)
+        await log_session(session.session_id, message, "scammer", session.scam_detected, 0.0, session.scam_category)
         return session, AgentReply(
             status="success",
             reply=counter_response,
             session_id=session.session_id,
             scam_detected=session.scam_detected,
             engagement_active=session.engagement_active,
+            confidence_score=0.0,
         )
 
     emotional_analysis = EmotionalIntelligenceEngine.analyze(
@@ -479,12 +484,20 @@ async def process_message(
     session = await _update_state(session, reply_text, "agent")
     await update_session(session)
 
+    _conf = hybrid_result.confidence if hybrid_result else 0.0
+    session.confidence_level = _conf
+    await log_session(
+        session.session_id, message, "scammer",
+        session.scam_detected, _conf, session.scam_category,
+    )
+
     return session, AgentReply(
         status="success",
         reply=reply_text,
         session_id=session.session_id,
         scam_detected=session.scam_detected,
         engagement_active=session.engagement_active,
+        confidence_score=round(_conf, 4),
     )
 
 

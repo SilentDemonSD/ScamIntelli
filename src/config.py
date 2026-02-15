@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     redis_sentinel_enabled: bool = False
     redis_sentinel_hosts: str = "sentinel-0:26379,sentinel-1:26379,sentinel-2:26379"
     redis_sentinel_master: str = "scamintelli-master"
+    redis_password: str = ""
     redis_pool_min: int = 10
     redis_pool_max: int = 100
     redis_retry_attempts: int = 3

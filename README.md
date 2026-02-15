@@ -630,12 +630,15 @@ Cloudflare (TLS + HTTP/2 + DDoS)
     ▼  port 80
   Nginx (least_conn LB, gzip, rate limiting)
     │
-    ├──► API container 1 (2 Uvicorn workers)
-    ├──► API container 2 (2 Uvicorn workers)
+    ├──► API container (2 Uvicorn workers, single instance)
     │
     ▼
-  Redis (512 MB, LRU eviction, AOF persistence)
+  Redis (384 MB, LRU eviction, AOF persistence, AUTH enabled)
 ```
+
+> **Scaling Note**: Docker Compose runs a **single API instance** for development.
+> For horizontal scaling with multiple replicas, use Kubernetes (see `docker/k8s/`).
+> See [ADR-001](docs/architecture/ADR-001-docker-compose-scaling.md) for details.
 
 ```bash
 cd docker
@@ -645,13 +648,7 @@ sudo ./deploy.sh
 
 # Or manual deployment
 docker compose build --no-cache
-docker compose up -d --scale api=2 --remove-orphans
-
-# Scale during traffic spikes
-docker compose up -d --scale api=3    # Max for 2 vCPU
-
-# Scale back down
-docker compose up -d --scale api=2
+docker compose up -d --remove-orphans
 
 # View logs
 docker compose logs -f api nginx
@@ -667,11 +664,30 @@ docker compose down
 
 | Container | CPU | RAM Limit | Instances |
 |-----------|-----|-----------|----------|
-| Nginx     | 0.20 | 128 MB   | 1        |
-| API       | 0.80 | 2560 MB  | 2 (default) |
-| Redis     | 0.20 | 768 MB   | 1        |
+| Nginx     | 0.15 | 96 MB    | 1        |
+| API       | 0.70 | 2560 MB  | 1        |
+| Redis     | 0.25 | 640 MB   | 1        |
 
-**Performance Estimates (`--scale api=2`)**:
+**Backpressure Tuning** (see [ADR-002](docs/architecture/ADR-002-backpressure-and-concurrency.md)):
+
+| Setting | Dev (Compose) | Prod (K8s) |
+|---------|---------------|------------|
+| `GUNICORN_WORKERS` | 2 | 4 |
+| `BACKPRESSURE_MAX_QUEUE_DEPTH` | 16 (2×8) | 32 (4×8) |
+| `BACKPRESSURE_SHED_THRESHOLD` | 0.85 | 0.85 |
+
+Monitor `p99_latency_ms` via `GET /api/v1/health/ready` to validate.
+
+**Redis Configuration** (see [ADR-003](docs/architecture/ADR-003-redis-ha-and-client-config.md)):
+
+| Setting | Dev (Compose) | Prod (K8s) |
+|---------|---------------|------------|
+| Connection | Direct `redis://` with AUTH | Sentinel-aware with AUTH |
+| `REDIS_SENTINEL_ENABLED` | `false` | `true` |
+| `protected-mode` | `yes` + `requirepass` | `requirepass` + `masterauth` |
+| Failover | Manual | Automatic (Sentinel) |
+
+**Performance Estimates (single instance)**:
 
 | Endpoint | Est. RPS | P50 Latency |
 |----------|---------|-------------|
@@ -679,14 +695,21 @@ docker compose down
 | `POST /message` (Gemini + ML) | 50-140 | ~200ms |
 | Concurrent connections | ~1,000 | — |
 
-### Kubernetes Migration
+### Kubernetes Production Deployment
 
-The Docker Compose setup maps 1:1 to the K8s manifests in `docker/k8s/`:
+K8s provides horizontal scaling, Redis Sentinel HA, and automatic failover — features intentionally omitted from the dev Compose setup.
+
+**Key differences from Compose**:
+- **API**: 3 replicas (HPA scales to 20), 4 Gunicorn workers per pod
+- **Redis**: 3-node StatefulSet with Sentinel sidecar, automatic failover
+- **Backpressure**: `BACKPRESSURE_MAX_QUEUE_DEPTH=32` aligned with 4 workers
+- **Auth**: Redis AUTH via `REDIS_PASSWORD` Secret, Sentinel auth-pass
 
 ```bash
+# Update secrets before applying
 kubectl apply -f docker/k8s/namespace.yaml
-kubectl apply -f docker/k8s/configmap.yaml
-kubectl apply -f docker/k8s/redis.yaml
+kubectl apply -f docker/k8s/configmap.yaml   # Includes Gunicorn, backpressure, Sentinel config
+kubectl apply -f docker/k8s/redis.yaml        # StatefulSet + Sentinel + AUTH
 kubectl apply -f docker/k8s/deployment.yaml
 kubectl apply -f docker/k8s/service.yaml
 kubectl apply -f docker/k8s/hpa.yaml

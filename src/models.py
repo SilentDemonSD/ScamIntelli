@@ -76,6 +76,7 @@ class AgentReply(BaseModel):
     session_id: str
     scam_detected: bool
     engagement_active: bool
+    confidence_score: float = Field(default=0.0, description="Scam detection confidence score")
 
 
 class ExtractedIntelligence(BaseModel):

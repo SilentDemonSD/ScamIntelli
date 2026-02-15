@@ -50,6 +50,21 @@ HARD_INDICATOR_PHRASES: FrozenSet[str] = frozenset(
         "digital arrest",
         "transfer now",
         "pay immediately",
+        "share your bank account",
+        "bank account number",
+        "share bank details",
+        "you have won",
+        "you won",
+        "claim your prize",
+        "processing fee",
+        "share your account",
+        "send your otp",
+        "give your password",
+        "share your pin",
+        "enter your card",
+        "provide bank details",
+        "share your aadhaar",
+        "send your pan",
     }
 )
 
@@ -153,36 +168,46 @@ class HybridScamDetectionEngine:
 
         if ensemble_pred.model_used == "ensemble":
             final_score = (
-                scores["keyword"] * 0.06
+                scores["keyword"] * 0.08
                 + scores["intent"] * 0.10
                 + scores["pattern"] * 0.06
-                + scores["emotion"] * 0.05
-                + scores["behavioral"] * 0.05
-                + scores["url_threat"] * 0.06
+                + scores["emotion"] * 0.04
+                + scores["behavioral"] * 0.04
+                + scores["url_threat"] * 0.05
                 + scores["multilingual"] * 0.02
                 + scores["multi_vector"] * 0.03
-                + scores["ml_model"] * 0.05
-                + scores["ensemble"] * 0.45
-                + scores["learned_patterns"] * 0.07
+                + scores["ml_model"] * 0.10
+                + scores["ensemble"] * 0.42
+                + scores["learned_patterns"] * 0.06
             )
         else:
             final_score = (
-                scores["keyword"] * 0.12
-                + scores["intent"] * 0.25
-                + scores["pattern"] * 0.12
-                + scores["emotion"] * 0.08
-                + scores["behavioral"] * 0.08
-                + scores["url_threat"] * 0.08
-                + scores["multilingual"] * 0.04
-                + scores["multi_vector"] * 0.05
-                + scores["ml_model"] * 0.12
-                + scores["learned_patterns"] * 0.06
+                scores["keyword"] * 0.15
+                + scores["intent"] * 0.20
+                + scores["pattern"] * 0.10
+                + scores["emotion"] * 0.06
+                + scores["behavioral"] * 0.06
+                + scores["url_threat"] * 0.06
+                + scores["multilingual"] * 0.03
+                + scores["multi_vector"] * 0.04
+                + scores["ml_model"] * 0.22
+                + scores["learned_patterns"] * 0.08
             )
+
+        # ML-ensemble consensus boost: when both strong models agree, trust them
+        ml_conf = scores.get("ml_model", 0.0)
+        ens_conf = scores.get("ensemble", 0.0)
+        if ml_conf >= 0.70 and ens_conf >= 0.70:
+            consensus = (ml_conf + ens_conf) / 2.0
+            final_score = max(final_score, consensus * 0.92)
+        elif ml_conf >= 0.80 or ens_conf >= 0.80:
+            stronger = max(ml_conf, ens_conf)
+            final_score = max(final_score, stronger * 0.85)
 
         has_hard = cls._has_hard_indicators(message)
 
-        if final_score > 0.75 and not has_hard:
-            final_score *= 0.7
+        if final_score > 0.85 and not has_hard:
+            final_score *= 0.82
 
         if has_hard and final_score > 0.3:
             final_score = max(final_score, 0.72)
@@ -191,10 +216,12 @@ class HybridScamDetectionEngine:
             final_score = max(final_score, 0.8)
 
         is_scam = (
-            final_score >= 0.72
+            final_score >= 0.65
             or intent_score >= 0.5
+            or (keyword_score >= 0.35 and (ml_conf >= 0.7 or ens_conf >= 0.7))
             or (keyword_score >= 0.4 and pattern_score >= 0.3)
             or (url_threat_score >= 0.7 and keyword_score >= 0.2)
+            or (ml_conf >= 0.85 and keyword_score >= 0.2)
         )
 
         return HybridDetectionResult(
@@ -316,17 +343,17 @@ class HybridScamDetectionEngine:
         is_ensemble = ensemble_model_used == "ensemble"
 
         layer_weights = {
-            "keyword": 0.06 if is_ensemble else 0.12,
-            "intent": 0.10 if is_ensemble else 0.25,
-            "pattern": 0.06 if is_ensemble else 0.12,
-            "emotion": 0.05 if is_ensemble else 0.08,
-            "behavioral": 0.05 if is_ensemble else 0.08,
-            "url_threat": 0.06 if is_ensemble else 0.08,
-            "multilingual": 0.02 if is_ensemble else 0.04,
-            "multi_vector": 0.03 if is_ensemble else 0.05,
-            "ml_model": 0.05 if is_ensemble else 0.12,
-            "ensemble": 0.45 if is_ensemble else 0.0,
-            "learned_patterns": 0.07 if is_ensemble else 0.06,
+            "keyword": 0.08 if is_ensemble else 0.15,
+            "intent": 0.10 if is_ensemble else 0.20,
+            "pattern": 0.06 if is_ensemble else 0.10,
+            "emotion": 0.04 if is_ensemble else 0.06,
+            "behavioral": 0.04 if is_ensemble else 0.06,
+            "url_threat": 0.05 if is_ensemble else 0.06,
+            "multilingual": 0.02 if is_ensemble else 0.03,
+            "multi_vector": 0.03 if is_ensemble else 0.04,
+            "ml_model": 0.10 if is_ensemble else 0.22,
+            "ensemble": 0.42 if is_ensemble else 0.0,
+            "learned_patterns": 0.06 if is_ensemble else 0.08,
         }
 
         layer_contributions = {}
@@ -387,11 +414,11 @@ class HybridScamDetectionEngine:
 
         if result.confidence >= 0.85:
             risk_level = "critical"
-        elif result.confidence >= 0.72:
+        elif result.confidence >= 0.65:
             risk_level = "high"
-        elif result.confidence >= 0.5:
+        elif result.confidence >= 0.45:
             risk_level = "medium"
-        elif result.confidence >= 0.3:
+        elif result.confidence >= 0.25:
             risk_level = "low"
         else:
             risk_level = "minimal"

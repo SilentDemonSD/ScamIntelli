@@ -94,7 +94,12 @@ CREDENTIAL_KEYWORDS: FrozenSet[str] = frozenset(
         "card number",
         "atm pin",
         "bank details",
+        "bank account",
+        "bank account number",
         "account number",
+        "share your bank",
+        "share your account",
+        "share bank details",
         "ifsc",
         "login",
         "verify",
@@ -113,6 +118,49 @@ CREDENTIAL_KEYWORDS: FrozenSet[str] = frozenset(
         "credit card",
         "expiry date",
         "date of birth",
+    }
+)
+
+PRIZE_LOTTERY_KEYWORDS: FrozenSet[str] = frozenset(
+    {
+        "you have won",
+        "you won",
+        "winner",
+        "lucky draw",
+        "lucky winner",
+        "lottery",
+        "prize money",
+        "prize",
+        "congratulations you won",
+        "claim your prize",
+        "claim prize",
+        "won a prize",
+        "won lakh",
+        "won crore",
+        "won some lakh",
+        "lakh prize",
+        "crore prize",
+        "jackpot",
+        "scratch card",
+        "gift card",
+        "whatsapp lucky draw",
+        "online lottery",
+        "lucky number",
+        "selected winner",
+        "cash prize",
+        "claim now",
+        "claim your",
+        "processing fee",
+        "winning amount",
+        "bumper prize",
+        "mega prize",
+        "won reward",
+        "reward claim",
+        "free gift",
+        "jeet gaye",
+        "jeeta hai",
+        "inaam",
+        "inam mila",
     }
 )
 
@@ -331,6 +379,7 @@ def get_all_scam_keywords() -> FrozenSet[str]:
         | THREAT_KEYWORDS
         | PAYMENT_KEYWORDS
         | CREDENTIAL_KEYWORDS
+        | PRIZE_LOTTERY_KEYWORDS
         | DIGITAL_ARREST_KEYWORDS
         | INVESTMENT_SCAM_KEYWORDS
         | JOB_SCAM_KEYWORDS
@@ -351,6 +400,7 @@ def get_keyword_categories() -> Dict[str, FrozenSet[str]]:
         "threat": THREAT_KEYWORDS,
         "payment": PAYMENT_KEYWORDS,
         "credential": CREDENTIAL_KEYWORDS,
+        "prize_lottery": PRIZE_LOTTERY_KEYWORDS,
         "digital_arrest": DIGITAL_ARREST_KEYWORDS,
         "investment": INVESTMENT_SCAM_KEYWORDS,
         "job_scam": JOB_SCAM_KEYWORDS,
@@ -366,7 +416,7 @@ def get_keyword_categories() -> Dict[str, FrozenSet[str]]:
 
 
 def get_high_severity_keywords() -> FrozenSet[str]:
-    return DIGITAL_ARREST_KEYWORDS | SEXTORTION_KEYWORDS | CREDENTIAL_KEYWORDS
+    return DIGITAL_ARREST_KEYWORDS | SEXTORTION_KEYWORDS | CREDENTIAL_KEYWORDS | PRIZE_LOTTERY_KEYWORDS
 
 
 def get_category_severity() -> Dict[str, int]:
@@ -375,6 +425,7 @@ def get_category_severity() -> Dict[str, int]:
         "sextortion": 9,
         "credential": 8,
         "customs": 8,
+        "prize_lottery": 7,
         "threat": 7,
         "investment": 7,
         "romance": 7,

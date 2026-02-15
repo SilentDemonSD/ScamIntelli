@@ -65,8 +65,16 @@ spec:
             - "yes"
             - --bind
             - "0.0.0.0"
-            - --protected-mode
-            - "no"
+            - --requirepass
+            - "$(REDIS_PASSWORD)"
+            - --masterauth
+            - "$(REDIS_PASSWORD)"
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: scamintelli-secrets
+                  key: REDIS_PASSWORD
           resources:
             requests:
               cpu: 200m
@@ -76,13 +84,13 @@ spec:
               memory: 1536Mi
           readinessProbe:
             exec:
-              command: ["redis-cli", "ping"]
+              command: ["redis-cli", "-a", "$(REDIS_PASSWORD)", "--no-auth-warning", "ping"]
             initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 3
           livenessProbe:
             exec:
-              command: ["redis-cli", "ping"]
+              command: ["redis-cli", "-a", "$(REDIS_PASSWORD)", "--no-auth-warning", "ping"]
             initialDelaySeconds: 15
             periodSeconds: 30
             timeoutSeconds: 5
@@ -95,11 +103,21 @@ spec:
             - containerPort: 26379
               name: sentinel
           command:
-            - redis-sentinel
-            - /etc/redis/sentinel.conf
+            - sh
+            - -c
+            - |
+              cp /etc/redis-template/sentinel.conf /tmp/sentinel.conf
+              sed -i "s/REDIS_PASSWORD_PLACEHOLDER/$REDIS_PASSWORD/g" /tmp/sentinel.conf
+              redis-sentinel /tmp/sentinel.conf
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: scamintelli-secrets
+                  key: REDIS_PASSWORD
           volumeMounts:
             - name: sentinel-config
-              mountPath: /etc/redis
+              mountPath: /etc/redis-template
           resources:
             requests:
               cpu: 50m
@@ -154,6 +172,7 @@ data:
     sentinel down-after-milliseconds scamintelli-master 5000
     sentinel failover-timeout scamintelli-master 10000
     sentinel parallel-syncs scamintelli-master 1
+    sentinel auth-pass scamintelli-master REDIS_PASSWORD_PLACEHOLDER
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget

@@ -267,6 +267,28 @@ class TrainingPipeline:
         scam_category: str = "unknown",
         metadata: Optional[Dict] = None,
     ) -> None:
+        TRAINING_DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+        # Dedup guard: skip if an identical text already exists
+        existing_texts: set[str] = set()
+        if TRAINING_DATA_PATH.exists():
+            with open(TRAINING_DATA_PATH, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        entry = json.loads(line)
+                        t = entry.get("text") or entry.get("message", "")
+                        if t:
+                            existing_texts.add(t)
+                    except json.JSONDecodeError:
+                        continue
+
+        if text in existing_texts:
+            logger.info("Skipping duplicate training sample: %.80s…", text)
+            return
+
         sample = {
             "text": text,
             "label": label,
@@ -276,7 +298,6 @@ class TrainingPipeline:
         if metadata:
             sample.update(metadata)
 
-        TRAINING_DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
         with open(TRAINING_DATA_PATH, "a", encoding="utf-8") as f:
             f.write(json.dumps(sample, ensure_ascii=False) + "\n")
 

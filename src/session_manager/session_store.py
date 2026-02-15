@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import Dict, Optional
 
 import redis.asyncio as redis
+from redis.asyncio.sentinel import Sentinel
 
 from src.config import get_settings
 from src.models import ExtractedIntelligence, PersonaStyle, SessionState
@@ -206,17 +207,29 @@ class RedisConnectionManager:
 
     @classmethod
     async def _create_sentinel_connection(cls) -> redis.Redis:
-        from redis.asyncio.sentinel import Sentinel
+        sentinel_kwargs = {
+            "socket_timeout": settings.redis_socket_timeout,
+            "decode_responses": True,
+        }
+        # Pass password for Sentinel auth if configured
+        if settings.redis_password:
+            sentinel_kwargs["password"] = settings.redis_password
 
         sentinel = Sentinel(
             settings.sentinel_host_list,
-            socket_timeout=settings.redis_socket_timeout,
-            decode_responses=True,
+            **sentinel_kwargs,
         )
+
+        master_kwargs = {
+            "socket_timeout": settings.redis_socket_timeout,
+            "db": 0,
+        }
+        if settings.redis_password:
+            master_kwargs["password"] = settings.redis_password
+
         return sentinel.master_for(
             settings.redis_sentinel_master,
-            socket_timeout=settings.redis_socket_timeout,
-            db=0,
+            **master_kwargs,
         )
 
     @classmethod

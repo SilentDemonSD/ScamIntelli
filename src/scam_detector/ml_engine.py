@@ -984,6 +984,27 @@ class MLScamDetector:
     def save_training_sample(cls, message: str, is_scam: bool) -> None:
         try:
             TRAINING_DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+            # Dedup guard: skip if an identical message already exists
+            existing_messages: set[str] = set()
+            if TRAINING_DATA_PATH.exists():
+                with open(TRAINING_DATA_PATH, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            entry = json.loads(line)
+                            msg = entry.get("message") or entry.get("text", "")
+                            if msg:
+                                existing_messages.add(msg)
+                        except json.JSONDecodeError:
+                            continue
+
+            if message in existing_messages:
+                logger.info("Skipping duplicate training sample: %.80s…", message)
+                return
+
             sample = {
                 "message": message,
                 "is_scam": is_scam,

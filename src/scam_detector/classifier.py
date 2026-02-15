@@ -7,6 +7,7 @@ from src.scam_detector.keywords import (
     CREDENTIAL_KEYWORDS,
     DIGITAL_ARREST_KEYWORDS,
     PAYMENT_KEYWORDS,
+    PRIZE_LOTTERY_KEYWORDS,
     THREAT_KEYWORDS,
     URGENCY_KEYWORDS,
     get_all_scam_keywords,
@@ -78,6 +79,10 @@ async def calculate_intent_score(message: str) -> float:
     payment_count = sum(1 for k in PAYMENT_KEYWORDS if k in message_lower)
     if payment_count > 0:
         score += min(payment_count * 0.2, 0.4)
+
+    prize_count = sum(1 for k in PRIZE_LOTTERY_KEYWORDS if k in message_lower)
+    if prize_count > 0:
+        score += min(prize_count * 0.25, 0.6)
 
     return min(score, 1.0)
 

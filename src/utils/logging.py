@@ -82,17 +82,31 @@ def get_logger(name: str) -> logging.Logger:
 
 
 async def log_session(
-    session_id: str, message: str, direction: str, scam_detected: bool = False
+    session_id: str,
+    message: str,
+    direction: str,
+    scam_detected: bool = False,
+    confidence: float = 0.0,
+    scam_category: str = None,
 ):
     log_file = Path("scamsession.txt")
     timestamp = datetime.now(timezone.utc).isoformat()
-    log_entry = f"[{timestamp}] SESSION: {session_id} | DIRECTION: {direction} | SCAM: {scam_detected} | MESSAGE: {message}\n"
+    log_entry = f"[{timestamp}] SESSION: {session_id} | DIRECTION: {direction} | SCAM: {scam_detected} | CONFIDENCE: {confidence:.4f} | MESSAGE: {message}\n"
+
+    extra = {
+        "session_id": session_id,
+        "direction": direction,
+        "scam_detected": scam_detected,
+        "confidence": round(confidence, 4),
+    }
+    if scam_category:
+        extra["scam_category"] = scam_category
 
     LogBuffer.add(
         level="INFO",
         source=f"session:{session_id}",
         message=f"[{direction}] {message}",
-        extra={"session_id": session_id, "direction": direction, "scam_detected": scam_detected},
+        extra=extra,
     )
 
     async with aiofiles.open(log_file, mode="a", encoding="utf-8") as f:

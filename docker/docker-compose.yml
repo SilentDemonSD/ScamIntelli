@@ -44,7 +44,7 @@ services:
     env_file:
       - ../.env
     environment:
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-scamintelli-dev}@redis:6379/0
       - USE_REDIS=true
       - LOG_LEVEL=WARNING
       - SESSION_TIMEOUT_SECONDS=3600
@@ -57,25 +57,27 @@ services:
       - GUNICORN_MAX_REQUESTS_JITTER=200
       - GUNICORN_TIMEOUT=30
       - GUNICORN_KEEPALIVE=5
-      - BACKPRESSURE_MAX_QUEUE_DEPTH=500
+      - BACKPRESSURE_MAX_QUEUE_DEPTH=16
+      - BACKPRESSURE_SHED_THRESHOLD=0.85
       - CIRCUIT_BREAKER_FAILURE_THRESHOLD=5
       - CIRCUIT_BREAKER_RECOVERY_TIMEOUT=30
-      - NEO4J_ENABLED=${NEO4J_ENABLED:-false}
+      - NEO4J_ENABLED=${NEO4J_ENABLED:-true}
       - NEO4J_URI=bolt://neo4j:7687
       - NEO4J_USER=neo4j
       - NEO4J_PASSWORD=${NEO4J_PASSWORD:-scamintelli}
     depends_on:
       redis:
         condition: service_healthy
+      neo4j:
+        condition: service_healthy
     volumes:
       - app_sessions:/app/sessions
     restart: unless-stopped
     deploy:
-      replicas: 2
       resources:
         limits:
           cpus: "0.70"
-          memory: 1536M
+          memory: 2560M
         reservations:
           cpus: "0.25"
           memory: 384M
@@ -105,12 +107,12 @@ services:
     env_file:
       - ../.env
     environment:
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-scamintelli-dev}@redis:6379/0
       - USE_REDIS=true
       - LOG_LEVEL=WARNING
       - WORKER_CONCURRENCY=4
       - TASK_QUEUE_MAX_RETRIES=3
-      - NEO4J_ENABLED=${NEO4J_ENABLED:-false}
+      - NEO4J_ENABLED=${NEO4J_ENABLED:-true}
       - NEO4J_URI=bolt://neo4j:7687
       - NEO4J_USER=neo4j
       - NEO4J_PASSWORD=${NEO4J_PASSWORD:-scamintelli}
@@ -119,7 +121,6 @@ services:
         condition: service_healthy
     restart: unless-stopped
     deploy:
-      replicas: 1
       resources:
         limits:
           cpus: "0.35"
@@ -159,7 +160,8 @@ services:
       --lfu-log-factor 10
       --activedefrag yes
       --bind 0.0.0.0
-      --protected-mode no
+      --protected-mode yes
+      --requirepass ${REDIS_PASSWORD:-scamintelli-dev}
     expose:
       - "6379"
     volumes:
@@ -176,7 +178,7 @@ services:
     networks:
       - scamintelli
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-scamintelli-dev}", "--no-auth-warning", "ping"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -197,9 +199,9 @@ services:
     environment:
       - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD:-scamintelli}
       - NEO4J_PLUGINS=[]
-      - NEO4J_server_memory_heap_initial__size=256m
-      - NEO4J_server_memory_heap_max__size=512m
-      - NEO4J_server_memory_pagecache_size=128m
+      - NEO4J_server_memory_heap_initial__size=128m
+      - NEO4J_server_memory_heap_max__size=256m
+      - NEO4J_server_memory_pagecache_size=64m
       - NEO4J_server_jvm_additional=-XX:+UseG1GC -XX:+ParallelRefProcEnabled
       - NEO4J_dbms_security_procedures_unrestricted=apoc.*
     expose:
@@ -211,11 +213,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.40"
-          memory: 1280M
+          cpus: "0.30"
+          memory: 512M
         reservations:
           cpus: "0.10"
-          memory: 512M
+          memory: 256M
     networks:
       - scamintelli
     healthcheck:
@@ -229,8 +231,6 @@ services:
       options:
         max-size: "5m"
         max-file: "2"
-    profiles:
-      - neo4j
 
 volumes:
   redis_data:

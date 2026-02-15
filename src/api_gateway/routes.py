@@ -541,6 +541,13 @@ async def get_session_visualization(
         "engagement_active": session.engagement_active,
     })
 
+    # URL-encode for safe embedding in JS (avoids single-quote/backslash issues)
+    import urllib.parse
+    details_encoded = urllib.parse.quote(details_json, safe='')
+    session_encoded = urllib.parse.quote(session_json, safe='')
+
+    html_content = html_content.replace("{{DETECTION_DETAILS_ENCODED}}", details_encoded)
+    html_content = html_content.replace("{{SESSION_DATA_ENCODED}}", session_encoded)
     html_content = html_content.replace("{{DETECTION_DETAILS}}", details_json)
     html_content = html_content.replace("{{SESSION_DATA}}", session_json)
 
