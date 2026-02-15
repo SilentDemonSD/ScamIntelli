@@ -1,3 +1,4 @@
+import asyncio
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,6 +26,8 @@ from src.models import (
 from src.scam_detector.ml_engine import MLScamDetector, PatternLearner
 from src.intelligence_extractor.network_analyzer import get_network_analyzer
 from src.intelligence_extractor.behavioral_fingerprint import get_fingerprinter
+from src.resilience.circuit_breaker import CircuitBreakerRegistry, CircuitOpenError
+from src.resilience.backpressure import BackpressureController
 from src.scam_detector.hybrid_engine import HybridScamDetectionEngine
 from src.scam_detector.training_pipeline import get_training_pipeline
 from src.scam_detector.data_generator import generate_training_data
@@ -34,12 +37,14 @@ from src.security.tamper_proof import (
     validate_incoming_request,
 )
 from src.session_manager.session_store import get_or_create_session, update_session
-from src.utils.logging import LogBuffer
+from src.utils.logging import LogBuffer, get_logger
 from src.utils.validation import sanitize_input, validate_message, validate_session_id
 
 settings = get_settings()
+logger = get_logger(__name__)
 router = APIRouter(prefix="/api/v1", tags=["honeypot"])
 _middleware = TamperProofMiddleware()
+_callback_circuit = CircuitBreakerRegistry.get("callback", failure_threshold=5, recovery_timeout=60)
 
 
 async def verify_api_key(x_api_key: Optional[str] = Header(None)) -> str:
@@ -81,7 +86,9 @@ async def handle_message(
     await update_session(session)
 
     if not session.engagement_active and await should_trigger_callback(session):
-        await send_guvi_callback(session)
+        await _dispatch_callback(session)
+
+    await _dispatch_background_tasks(session)
 
     return reply
 
@@ -120,7 +127,7 @@ async def honeypot_endpoint(
 
     conversation_complete = not session.engagement_active or session.turn_count >= 10
     if conversation_complete and session.scam_detected:
-        await send_guvi_callback(session)
+        await _dispatch_callback(session)
 
     persona_type = getattr(session, "persona_type", None)
     if persona_type is None:
@@ -162,9 +169,9 @@ async def end_session(session_id: str, api_key: str = Depends(verify_api_key)):
         raise HTTPException(status_code=400, detail="Invalid session ID format")
 
     session = await get_or_create_session(session_id)
-    callback_sent = (
-        await send_guvi_callback(session) if session.scam_detected else False
-    )
+    callback_sent = False
+    if session.scam_detected:
+        callback_sent = await _dispatch_callback(session)
 
     from src.session_manager.session_store import get_or_create_session_store
 
@@ -183,6 +190,61 @@ async def end_session(session_id: str, api_key: str = Depends(verify_api_key)):
 @router.get("/health", response_model=HealthResponse)
 async def health_check():
     return HealthResponse(status="healthy", timestamp=datetime.now(timezone.utc))
+
+
+@router.get("/health/ready")
+async def readiness_check():
+    checks = {"api": True}
+
+    if settings.use_redis:
+        try:
+            from src.session_manager.session_store import RedisConnectionManager
+            conn = await RedisConnectionManager.get_connection()
+            await asyncio.wait_for(conn.ping(), timeout=2.0)
+            checks["redis"] = True
+        except Exception:
+            checks["redis"] = False
+
+    try:
+        pipeline = get_training_pipeline()
+        checks["ml_model"] = pipeline.is_trained
+    except Exception:
+        checks["ml_model"] = False
+
+    if settings.neo4j_enabled:
+        try:
+            from src.graph.neo4j_backend import Neo4jGraphStore
+            store = Neo4jGraphStore.get_instance()
+            if store:
+                checks["neo4j"] = await store.health_check()
+            else:
+                checks["neo4j"] = False
+        except Exception:
+            checks["neo4j"] = False
+
+    all_healthy = all(checks.values())
+    bp = BackpressureController.get_instance()
+    metrics = bp.get_metrics()
+
+    circuits = CircuitBreakerRegistry.get_all_status()
+
+    status_code = 200 if all_healthy else 503
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "status": "ready" if all_healthy else "degraded",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "checks": checks,
+            "load": {
+                "active_requests": metrics.active_requests,
+                "avg_latency_ms": metrics.avg_latency_ms,
+                "p99_latency_ms": metrics.p99_latency_ms,
+                "rejected": metrics.rejected_requests,
+            },
+            "circuits": circuits,
+        },
+    )
 
 
 @router.get("/summary/{session_id}")
@@ -290,45 +352,31 @@ async def get_logs(
 
 @router.get("/network/analysis")
 async def get_network_analysis(api_key: str = Depends(verify_api_key)):
-    analyzer = get_network_analyzer()
-    stats = analyzer.get_network_statistics()
-    rings = analyzer.detect_fraud_rings()
-    kingpins = analyzer.identify_kingpins(top_n=10)
+    from src.graph.graph_backend import get_graph_cache
 
-    return {
-        "network_statistics": {
-            "total_entities": stats.total_entities,
-            "total_edges": stats.total_edges,
-            "total_sessions_tracked": stats.total_sessions_tracked,
-            "connected_components": stats.connected_components,
-            "fraud_rings_detected": stats.fraud_rings_detected,
-            "average_cluster_coefficient": stats.average_cluster_coefficient,
-            "network_density": stats.network_density,
-            "top_entity_types": stats.top_entity_types,
-        },
-        "fraud_rings": [
-            {
-                "ring_id": r.ring_id,
-                "size": r.size,
-                "risk_score": r.risk_score,
-                "sessions": r.sessions,
-                "entity_types": r.entity_types,
-                "first_seen": r.first_seen,
-                "last_seen": r.last_seen,
-            }
-            for r in rings[:20]
-        ],
-        "kingpin_entities": [
-            {
-                "entity_value": k.entity_value,
-                "entity_type": k.entity_type,
-                "centrality_score": k.centrality_score,
-                "connected_sessions": k.connected_sessions,
-                "connected_entities": k.connected_entities,
-            }
-            for k in kingpins
-        ],
-    }
+    cache = get_graph_cache()
+    cached = await cache.get("network_analysis")
+    if cached is not None:
+        return cached
+
+    analyzer = get_network_analyzer()
+
+    try:
+        loop = asyncio.get_running_loop()
+        result = await asyncio.wait_for(
+            loop.run_in_executor(
+                None, _compute_network_analysis, analyzer
+            ),
+            timeout=settings.graph_computation_timeout,
+        )
+    except asyncio.TimeoutError:
+        raise HTTPException(
+            status_code=504,
+            detail="Network analysis computation timed out",
+        )
+
+    await cache.put("network_analysis", result)
+    return result
 
 
 @router.post("/session/{session_id}/fingerprint")
@@ -564,3 +612,106 @@ async def predict_single(
             "feature_importance": prediction.feature_importance,
         },
     }
+
+
+def _compute_network_analysis(analyzer):
+    stats = analyzer.get_network_statistics()
+    rings = analyzer.detect_fraud_rings()
+    kingpins = analyzer.identify_kingpins(top_n=10)
+
+    return {
+        "network_statistics": {
+            "total_entities": stats.total_entities,
+            "total_edges": stats.total_edges,
+            "total_sessions_tracked": stats.total_sessions_tracked,
+            "connected_components": stats.connected_components,
+            "fraud_rings_detected": stats.fraud_rings_detected,
+            "average_cluster_coefficient": stats.average_cluster_coefficient,
+            "network_density": stats.network_density,
+            "top_entity_types": stats.top_entity_types,
+        },
+        "fraud_rings": [
+            {
+                "ring_id": r.ring_id,
+                "size": r.size,
+                "risk_score": r.risk_score,
+                "sessions": r.sessions,
+                "entity_types": r.entity_types,
+                "first_seen": r.first_seen,
+                "last_seen": r.last_seen,
+            }
+            for r in rings[:20]
+        ],
+        "kingpin_entities": [
+            {
+                "entity_value": k.entity_value,
+                "entity_type": k.entity_type,
+                "centrality_score": k.centrality_score,
+                "connected_sessions": k.connected_sessions,
+                "connected_entities": k.connected_entities,
+            }
+            for k in kingpins
+        ],
+    }
+
+
+async def _dispatch_callback(session) -> bool:
+    broker = None
+    try:
+        from src.task_queue.broker import get_or_create_broker
+        broker = await get_or_create_broker()
+    except Exception:
+        pass
+
+    if broker:
+        try:
+            session_data = json.loads(session.model_dump_json())
+            await broker.enqueue_callback(session.session_id, session_data)
+            return True
+        except Exception as e:
+            logger.warning(f"Queue dispatch failed, falling back to sync: {e}")
+
+    try:
+        return await _callback_circuit.call(send_guvi_callback, session)
+    except CircuitOpenError:
+        logger.warning(f"Callback circuit open for session {session.session_id}")
+        return False
+    except Exception as e:
+        logger.error(f"Callback failed for session {session.session_id}: {e}")
+        return False
+
+
+async def _dispatch_background_tasks(session) -> None:
+    broker = None
+    try:
+        from src.task_queue.broker import get_or_create_broker
+        broker = await get_or_create_broker()
+    except Exception:
+        pass
+
+    if not broker:
+        return
+
+    try:
+        intel = session.extracted_intel
+        if intel.upi_ids or intel.phone_numbers or intel.bank_accounts or intel.phishing_links:
+            intel_data = {
+                "upi_ids": intel.upi_ids,
+                "phone_numbers": intel.phone_numbers,
+                "bank_accounts": intel.bank_accounts,
+                "phishing_links": intel.phishing_links,
+                "suspicious_keywords": intel.suspicious_keywords,
+            }
+            await broker.enqueue_graph_update(session.session_id, intel_data)
+    except Exception as e:
+        logger.debug(f"Graph update dispatch failed: {e}")
+
+    try:
+        if session.turn_count >= 3 and session.scam_detected:
+            await broker.enqueue_fingerprint(
+                session.session_id,
+                session.messages[-20:],
+            )
+    except Exception as e:
+        logger.debug(f"Fingerprint dispatch failed: {e}")
+

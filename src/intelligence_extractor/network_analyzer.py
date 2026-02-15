@@ -1,13 +1,16 @@
+import asyncio
 import hashlib
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, FrozenSet, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set
 
+from src.config import get_settings
 from src.models import ExtractedIntelligence
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
+settings = get_settings()
 
 try:
     import networkx as nx
@@ -100,6 +103,7 @@ class ScammerNetworkAnalyzer:
         }
 
         session_entities: List[str] = []
+        neo4j_entities: List[Dict[str, Any]] = []
 
         for entity_type, values in entity_map.items():
             for value in values:
@@ -110,6 +114,13 @@ class ScammerNetworkAnalyzer:
                 self._entity_timestamps[entity_key].append(now)
                 session_entities.append(entity_key)
 
+                neo4j_entities.append({
+                    "key": entity_key,
+                    "type": entity_type,
+                    "value": value,
+                    "weight": ENTITY_WEIGHTS.get(entity_type, 0.5),
+                })
+
                 if not self._graph.has_node(entity_key):
                     self._graph.add_node(
                         entity_key,
@@ -119,6 +130,7 @@ class ScammerNetworkAnalyzer:
                     )
                     entities_added += 1
 
+        neo4j_pairs: List[Dict[str, str]] = []
         for i in range(len(session_entities)):
             for j in range(i + 1, len(session_entities)):
                 e1, e2 = session_entities[i], session_entities[j]
@@ -129,9 +141,66 @@ class ScammerNetworkAnalyzer:
                     self._graph.add_edge(
                         e1, e2, weight=1, sessions={session_id}
                     )
+                neo4j_pairs.append({
+                    "key1": e1, "key2": e2, "session_id": session_id
+                })
 
         self._dirty = True
+
+        if settings.neo4j_enabled and neo4j_entities:
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(
+                    self._persist_to_neo4j(session_id, neo4j_entities, neo4j_pairs)
+                )
+            except RuntimeError:
+                pass
+
         return entities_added
+
+    async def _persist_to_neo4j(
+        self,
+        session_id: str,
+        entities: List[Dict[str, Any]],
+        pairs: List[Dict[str, str]],
+    ) -> None:
+        try:
+            from src.graph.neo4j_backend import Neo4jGraphStore
+            store = Neo4jGraphStore.get_instance()
+            if store is None:
+                return
+            await store.add_entities(session_id, entities)
+            if pairs:
+                await store.link_entities(pairs)
+        except Exception as e:
+            logger.debug(f"Neo4j persist failed (non-blocking): {e}")
+
+    async def sync_from_neo4j(self) -> bool:
+        try:
+            from src.graph.neo4j_backend import Neo4jGraphStore
+            store = Neo4jGraphStore.get_instance()
+            if store is None:
+                return False
+
+            data = await store.load_to_networkx()
+            if data is None:
+                return False
+
+            self._graph = data["graph"]
+            self._entity_types = data["entity_types"]
+            for k, v in data["entity_sessions"].items():
+                self._entity_sessions[k] = v
+            for k, v in data["session_entities"].items():
+                self._session_entities[k] = v
+            self._dirty = False
+            logger.info(
+                f"Synced {self._graph.number_of_nodes()} entities "
+                f"from Neo4j"
+            )
+            return True
+        except Exception as e:
+            logger.warning(f"Neo4j sync failed: {e}")
+            return False
 
     def detect_fraud_rings(self) -> List[FraudRing]:
         if not HAS_NETWORKX or self._graph is None:

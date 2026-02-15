@@ -2270,3 +2270,156 @@
 {"text": "What time does the store close today?", "label": 0, "scam_category": "none"}
 {"text": "New phone lena hai. Budget 2000 hai.", "label": 0, "scam_category": "none"}
 {"text": "I've been following your profile. You seem like a genuine person. Can we talk about business?", "label": 1, "scam_category": "subtle_trust_building"}
+{"message": "Your account is suspended! Share OTP or arrest warrant will be issued!", "is_scam": true, "timestamp": "2026-02-15T05:36:04.495824+00:00"}
+{"message": "Urgent! Send OTP immediately or your account will be blocked and police will arrest you!", "is_scam": true, "timestamp": "2026-02-15T05:36:04.687719+00:00"}
+{"message": "Urgent! Share OTP now or your account will be blocked! Send immediately!", "is_scam": true, "timestamp": "2026-02-15T05:36:04.916925+00:00"}
+{"message": "Your account is under investigation. I am calling from CBI.", "is_scam": true, "timestamp": "2026-02-15T05:36:07.070442+00:00"}
+{"message": "Share your OTP immediately for verification!", "is_scam": true, "timestamp": "2026-02-15T05:36:08.040354+00:00"}
+{"message": "If you don't cooperate, arrest warrant will be issued!", "is_scam": true, "timestamp": "2026-02-15T05:36:08.955351+00:00"}
+{"message": "Send money to test@ybl immediately or face arrest! Call 9876543210 now!", "is_scam": true, "timestamp": "2026-02-15T05:36:10.581902+00:00"}
+{"message": "Urgent! Your account suspended! Send OTP immediately or arrest warrant issued!", "is_scam": true, "timestamp": "2026-02-15T05:36:16.246365+00:00"}
+{"message": "Send OTP now or account blocked!", "is_scam": true, "timestamp": "2026-02-15T05:36:24.647662+00:00"}
+{"message": "Send OTP now! Your account is suspended!", "is_scam": true, "timestamp": "2026-02-15T05:36:33.369263+00:00"}
+{"message": "This is Inspector Sharma from CBI. Your Aadhaar has been used in money laundering. Arrest warrant issued. Cooperate or face jail!", "is_scam": true, "timestamp": "2026-02-15T05:36:40.280670+00:00"}
+{"message": "Dear customer, your bank account KYC is expired. Click here to verify: https://fake-bank.xyz/kyc or account will be blocked.", "is_scam": true, "timestamp": "2026-02-15T05:36:42.371956+00:00"}
+{"message": "Congratulations! You are selected for work from home job. Salary 50000 per month. Pay 2000 registration fee to start immediately!", "is_scam": true, "timestamp": "2026-02-15T05:36:48.872406+00:00"}
+{"message": "Guaranteed 300% returns on investment! Invest 10000 now via UPI invest@ybl. Limited time offer, act now! Already 10000 members earning daily!", "is_scam": true, "timestamp": "2026-02-15T05:36:51.308829+00:00"}
+{"message": "Sir aapke account mein unauthorized transaction detected hai. Please OTP share kariye turant verification ke liye. OTP bhejo jaldi!", "is_scam": true, "timestamp": "2026-02-15T05:36:53.768473+00:00"}
+{"message": "Payment receive karne ke liye QR code scan karo. Scan karke amount enter karo, paisa aa jaayega.", "is_scam": true, "timestamp": "2026-02-15T05:37:00.771294+00:00"}
+{"message": "Jaldi karo, turant OTP bhejo warna account block ho jaayega! Police aa rahi hai arrest ke liye!", "is_scam": true, "timestamp": "2026-02-15T05:37:05.561501+00:00"}
+{"message": "Click this link https://malicious.xyz and enter your OTP. Call us at 9876543210 or money will be deducted from your account!", "is_scam": true, "timestamp": "2026-02-15T05:37:07.859886+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T05:37:14.618030+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T05:37:14.793054+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T05:37:14.991473+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T05:37:15.160711+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T05:37:15.357189+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T05:37:15.532890+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T05:37:15.698008+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T05:37:15.868884+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T05:37:16.041536+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T05:37:16.251795+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T05:37:16.451424+00:00"}
+{"message": "Your account will be blocked! Send OTP immediately to verify! Call +919876543210 now!", "is_scam": true, "timestamp": "2026-02-15T05:37:19.033450+00:00"}
+{"message": "Send OTP now! Share otp immediately! Account will be suspended!", "is_scam": true, "timestamp": "2026-02-15T05:37:19.192670+00:00"}
+{"message": "Click this link to verify your account https://sbi-fake.tk/verify", "is_scam": true, "timestamp": "2026-02-15T05:37:19.352046+00:00"}
+{"message": "Police will arrest you immediately!", "is_scam": true, "timestamp": "2026-02-15T05:37:19.518166+00:00"}
+{"message": "Abhi turant paisa bhejo, account block ho jayega, arrest warrant pending", "is_scam": true, "timestamp": "2026-02-15T05:37:19.677614+00:00"}
+{"message": "Last chance! Final warning! Act now or else!", "is_scam": true, "timestamp": "2026-02-15T05:37:19.846081+00:00"}
+{"message": "Click this link https://evil.com, share OTP and call +919876543210", "is_scam": true, "timestamp": "2026-02-15T05:37:20.006459+00:00"}
+{"message": "test message some scam word verify account", "is_scam": true, "timestamp": "2026-02-15T05:37:20.164781+00:00"}
+{"message": "You will be arrested! Send OTP!", "is_scam": true, "timestamp": "2026-02-15T05:37:20.329183+00:00"}
+{"message": "Your account is suspended! Share OTP or arrest warrant will be issued!", "is_scam": true, "timestamp": "2026-02-15T05:37:41.863960+00:00"}
+{"message": "Urgent! Send OTP immediately or your account will be blocked and police will arrest you!", "is_scam": true, "timestamp": "2026-02-15T05:37:42.076444+00:00"}
+{"message": "Urgent! Share OTP now or your account will be blocked! Send immediately!", "is_scam": true, "timestamp": "2026-02-15T05:37:42.338049+00:00"}
+{"message": "Your account is under investigation. I am calling from CBI.", "is_scam": true, "timestamp": "2026-02-15T05:37:44.954626+00:00"}
+{"message": "Share your OTP immediately for verification!", "is_scam": true, "timestamp": "2026-02-15T05:37:45.929565+00:00"}
+{"message": "If you don't cooperate, arrest warrant will be issued!", "is_scam": true, "timestamp": "2026-02-15T05:37:46.815368+00:00"}
+{"message": "Send money to test@ybl immediately or face arrest! Call 9876543210 now!", "is_scam": true, "timestamp": "2026-02-15T05:37:48.262679+00:00"}
+{"message": "Urgent! Your account suspended! Send OTP immediately or arrest warrant issued!", "is_scam": true, "timestamp": "2026-02-15T05:37:55.597013+00:00"}
+{"message": "Send OTP now or account blocked!", "is_scam": true, "timestamp": "2026-02-15T05:38:02.212984+00:00"}
+{"message": "Send OTP now! Your account is suspended!", "is_scam": true, "timestamp": "2026-02-15T05:38:10.879306+00:00"}
+{"message": "This is Inspector Sharma from CBI. Your Aadhaar has been used in money laundering. Arrest warrant issued. Cooperate or face jail!", "is_scam": true, "timestamp": "2026-02-15T05:38:18.724536+00:00"}
+{"message": "Dear customer, your bank account KYC is expired. Click here to verify: https://fake-bank.xyz/kyc or account will be blocked.", "is_scam": true, "timestamp": "2026-02-15T05:38:21.070978+00:00"}
+{"message": "Congratulations! You are selected for work from home job. Salary 50000 per month. Pay 2000 registration fee to start immediately!", "is_scam": true, "timestamp": "2026-02-15T05:38:27.569445+00:00"}
+{"message": "Guaranteed 300% returns on investment! Invest 10000 now via UPI invest@ybl. Limited time offer, act now! Already 10000 members earning daily!", "is_scam": true, "timestamp": "2026-02-15T05:38:29.891915+00:00"}
+{"message": "Sir aapke account mein unauthorized transaction detected hai. Please OTP share kariye turant verification ke liye. OTP bhejo jaldi!", "is_scam": true, "timestamp": "2026-02-15T05:38:33.030478+00:00"}
+{"message": "Payment receive karne ke liye QR code scan karo. Scan karke amount enter karo, paisa aa jaayega.", "is_scam": true, "timestamp": "2026-02-15T05:38:41.704759+00:00"}
+{"message": "Jaldi karo, turant OTP bhejo warna account block ho jaayega! Police aa rahi hai arrest ke liye!", "is_scam": true, "timestamp": "2026-02-15T05:38:46.519890+00:00"}
+{"message": "Click this link https://malicious.xyz and enter your OTP. Call us at 9876543210 or money will be deducted from your account!", "is_scam": true, "timestamp": "2026-02-15T05:38:48.807276+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T05:38:54.969940+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T05:38:55.151026+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T05:38:55.326347+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T05:38:55.509039+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T05:38:55.701403+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T05:38:55.888191+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T05:38:56.056955+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T05:38:56.235725+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T05:38:56.408238+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T05:38:56.585147+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T05:38:56.755460+00:00"}
+{"message": "Your account will be blocked! Send OTP immediately to verify! Call +919876543210 now!", "is_scam": true, "timestamp": "2026-02-15T05:38:58.946129+00:00"}
+{"message": "Send OTP now! Share otp immediately! Account will be suspended!", "is_scam": true, "timestamp": "2026-02-15T05:38:59.118158+00:00"}
+{"message": "Click this link to verify your account https://sbi-fake.tk/verify", "is_scam": true, "timestamp": "2026-02-15T05:38:59.291759+00:00"}
+{"message": "Police will arrest you immediately!", "is_scam": true, "timestamp": "2026-02-15T05:38:59.469009+00:00"}
+{"message": "Abhi turant paisa bhejo, account block ho jayega, arrest warrant pending", "is_scam": true, "timestamp": "2026-02-15T05:38:59.655585+00:00"}
+{"message": "Last chance! Final warning! Act now or else!", "is_scam": true, "timestamp": "2026-02-15T05:38:59.847635+00:00"}
+{"message": "Click this link https://evil.com, share OTP and call +919876543210", "is_scam": true, "timestamp": "2026-02-15T05:39:00.033884+00:00"}
+{"message": "test message some scam word verify account", "is_scam": true, "timestamp": "2026-02-15T05:39:00.223563+00:00"}
+{"message": "You will be arrested! Send OTP!", "is_scam": true, "timestamp": "2026-02-15T05:39:00.418059+00:00"}
+{"message": "Your account is suspended! Share OTP or arrest warrant will be issued!", "is_scam": true, "timestamp": "2026-02-15T06:22:46.028931+00:00"}
+{"message": "Urgent! Send OTP immediately or your account will be blocked and police will arrest you!", "is_scam": true, "timestamp": "2026-02-15T06:22:46.228318+00:00"}
+{"message": "Urgent! Share OTP now or your account will be blocked! Send immediately!", "is_scam": true, "timestamp": "2026-02-15T06:22:46.426923+00:00"}
+{"message": "Your account is under investigation. I am calling from CBI.", "is_scam": true, "timestamp": "2026-02-15T06:22:48.803959+00:00"}
+{"message": "Share your OTP immediately for verification!", "is_scam": true, "timestamp": "2026-02-15T06:22:49.829874+00:00"}
+{"message": "If you don't cooperate, arrest warrant will be issued!", "is_scam": true, "timestamp": "2026-02-15T06:22:51.066602+00:00"}
+{"message": "Send OTP now! Final warning!", "is_scam": true, "timestamp": "2026-02-15T06:22:51.884452+00:00"}
+{"message": "Send money to test@ybl immediately or face arrest! Call 9876543210 now!", "is_scam": true, "timestamp": "2026-02-15T06:22:52.598035+00:00"}
+{"message": "Urgent! Your account suspended! Send OTP immediately or arrest warrant issued!", "is_scam": true, "timestamp": "2026-02-15T06:23:00.556224+00:00"}
+{"message": "Send OTP now or account blocked!", "is_scam": true, "timestamp": "2026-02-15T06:23:09.020879+00:00"}
+{"message": "Send OTP now! Your account is suspended!", "is_scam": true, "timestamp": "2026-02-15T06:23:17.191741+00:00"}
+{"message": "This is Inspector Sharma from CBI. Your Aadhaar has been used in money laundering. Arrest warrant issued. Cooperate or face jail!", "is_scam": true, "timestamp": "2026-02-15T06:23:28.445475+00:00"}
+{"message": "Dear customer, your bank account KYC is expired. Click here to verify: https://fake-bank.xyz/kyc or account will be blocked.", "is_scam": true, "timestamp": "2026-02-15T06:23:32.202699+00:00"}
+{"message": "Congratulations! You are selected for work from home job. Salary 50000 per month. Pay 2000 registration fee to start immediately!", "is_scam": true, "timestamp": "2026-02-15T06:23:42.416149+00:00"}
+{"message": "Guaranteed 300% returns on investment! Invest 10000 now via UPI invest@ybl. Limited time offer, act now! Already 10000 members earning daily!", "is_scam": true, "timestamp": "2026-02-15T06:23:44.767602+00:00"}
+{"message": "Sir aapke account mein unauthorized transaction detected hai. Please OTP share kariye turant verification ke liye. OTP bhejo jaldi!", "is_scam": true, "timestamp": "2026-02-15T06:23:47.281131+00:00"}
+{"message": "Payment receive karne ke liye QR code scan karo. Scan karke amount enter karo, paisa aa jaayega.", "is_scam": true, "timestamp": "2026-02-15T06:24:00.939206+00:00"}
+{"message": "Jaldi karo, turant OTP bhejo warna account block ho jaayega! Police aa rahi hai arrest ke liye!", "is_scam": true, "timestamp": "2026-02-15T06:24:06.453387+00:00"}
+{"message": "Click this link https://malicious.xyz and enter your OTP. Call us at 9876543210 or money will be deducted from your account!", "is_scam": true, "timestamp": "2026-02-15T06:24:08.577555+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T06:24:14.589806+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T06:24:14.761779+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T06:24:14.951198+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T06:24:15.139045+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T06:24:15.342585+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T06:24:15.524478+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T06:24:15.691854+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T06:24:15.888565+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T06:24:16.055132+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T06:24:16.232118+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T06:24:16.426514+00:00"}
+{"message": "Your account will be blocked! Send OTP immediately to verify! Call +919876543210 now!", "is_scam": true, "timestamp": "2026-02-15T06:24:18.480304+00:00"}
+{"message": "Send OTP now! Share otp immediately! Account will be suspended!", "is_scam": true, "timestamp": "2026-02-15T06:24:18.665752+00:00"}
+{"message": "Click this link to verify your account https://sbi-fake.tk/verify", "is_scam": true, "timestamp": "2026-02-15T06:24:18.831518+00:00"}
+{"message": "Police will arrest you immediately!", "is_scam": true, "timestamp": "2026-02-15T06:24:19.029447+00:00"}
+{"message": "Abhi turant paisa bhejo, account block ho jayega, arrest warrant pending", "is_scam": true, "timestamp": "2026-02-15T06:24:19.203278+00:00"}
+{"message": "Last chance! Final warning! Act now or else!", "is_scam": true, "timestamp": "2026-02-15T06:24:19.379828+00:00"}
+{"message": "Click this link https://evil.com, share OTP and call +919876543210", "is_scam": true, "timestamp": "2026-02-15T06:24:19.548872+00:00"}
+{"message": "test message some scam word verify account", "is_scam": true, "timestamp": "2026-02-15T06:24:19.709492+00:00"}
+{"message": "You will be arrested! Send OTP!", "is_scam": true, "timestamp": "2026-02-15T06:24:19.861353+00:00"}
+{"message": "Your account is suspended! Share OTP or arrest warrant will be issued!", "is_scam": true, "timestamp": "2026-02-15T06:32:39.300982+00:00"}
+{"message": "Urgent! Send OTP immediately or your account will be blocked and police will arrest you!", "is_scam": true, "timestamp": "2026-02-15T06:32:39.467570+00:00"}
+{"message": "Urgent! Share OTP now or your account will be blocked! Send immediately!", "is_scam": true, "timestamp": "2026-02-15T06:32:39.684084+00:00"}
+{"message": "Your account is under investigation. I am calling from CBI.", "is_scam": true, "timestamp": "2026-02-15T06:32:42.693736+00:00"}
+{"message": "Share your OTP immediately for verification!", "is_scam": true, "timestamp": "2026-02-15T06:32:43.597198+00:00"}
+{"message": "If you don't cooperate, arrest warrant will be issued!", "is_scam": true, "timestamp": "2026-02-15T06:32:44.848512+00:00"}
+{"message": "Send money to test@ybl immediately or face arrest! Call 9876543210 now!", "is_scam": true, "timestamp": "2026-02-15T06:32:46.063060+00:00"}
+{"message": "Urgent! Your account suspended! Send OTP immediately or arrest warrant issued!", "is_scam": true, "timestamp": "2026-02-15T06:32:52.038043+00:00"}
+{"message": "Send OTP now or account blocked!", "is_scam": true, "timestamp": "2026-02-15T06:33:02.167961+00:00"}
+{"message": "Send OTP now! Your account is suspended!", "is_scam": true, "timestamp": "2026-02-15T06:33:11.140309+00:00"}
+{"message": "This is Inspector Sharma from CBI. Your Aadhaar has been used in money laundering. Arrest warrant issued. Cooperate or face jail!", "is_scam": true, "timestamp": "2026-02-15T06:33:19.825904+00:00"}
+{"message": "Dear customer, your bank account KYC is expired. Click here to verify: https://fake-bank.xyz/kyc or account will be blocked.", "is_scam": true, "timestamp": "2026-02-15T06:33:22.701530+00:00"}
+{"message": "Congratulations! You are selected for work from home job. Salary 50000 per month. Pay 2000 registration fee to start immediately!", "is_scam": true, "timestamp": "2026-02-15T06:33:33.453440+00:00"}
+{"message": "Guaranteed 300% returns on investment! Invest 10000 now via UPI invest@ybl. Limited time offer, act now! Already 10000 members earning daily!", "is_scam": true, "timestamp": "2026-02-15T06:33:36.125359+00:00"}
+{"message": "Sir aapke account mein unauthorized transaction detected hai. Please OTP share kariye turant verification ke liye. OTP bhejo jaldi!", "is_scam": true, "timestamp": "2026-02-15T06:33:38.393906+00:00"}
+{"message": "Payment receive karne ke liye QR code scan karo. Scan karke amount enter karo, paisa aa jaayega.", "is_scam": true, "timestamp": "2026-02-15T06:33:47.064260+00:00"}
+{"message": "Jaldi karo, turant OTP bhejo warna account block ho jaayega! Police aa rahi hai arrest ke liye!", "is_scam": true, "timestamp": "2026-02-15T06:33:51.519385+00:00"}
+{"message": "Click this link https://malicious.xyz and enter your OTP. Call us at 9876543210 or money will be deducted from your account!", "is_scam": true, "timestamp": "2026-02-15T06:33:53.827753+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T06:34:00.979959+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T06:34:01.141925+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T06:34:01.299006+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T06:34:01.460231+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T06:34:01.628297+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T06:34:01.784199+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T06:34:01.939490+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T06:34:02.109543+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T06:34:02.284423+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T06:34:02.461666+00:00"}
+{"message": "Your account will be blocked immediately. Send OTP now to 9876543210 or police will arrest you. Pay \u20b95000 to avoid penalty at https://fake-bank.com. This is from RBI official department. Share your aadhaar and pan card.", "is_scam": true, "timestamp": "2026-02-15T06:34:02.612042+00:00"}
+{"message": "Your account will be blocked! Send OTP immediately to verify! Call +919876543210 now!", "is_scam": true, "timestamp": "2026-02-15T06:34:05.758203+00:00"}
+{"message": "Send OTP now! Share otp immediately! Account will be suspended!", "is_scam": true, "timestamp": "2026-02-15T06:34:05.965180+00:00"}
+{"message": "Click this link to verify your account https://sbi-fake.tk/verify", "is_scam": true, "timestamp": "2026-02-15T06:34:06.125235+00:00"}
+{"message": "Police will arrest you immediately!", "is_scam": true, "timestamp": "2026-02-15T06:34:06.316381+00:00"}
+{"message": "Abhi turant paisa bhejo, account block ho jayega, arrest warrant pending", "is_scam": true, "timestamp": "2026-02-15T06:34:06.533409+00:00"}
+{"message": "Last chance! Final warning! Act now or else!", "is_scam": true, "timestamp": "2026-02-15T06:34:06.712663+00:00"}
+{"message": "Click this link https://evil.com, share OTP and call +919876543210", "is_scam": true, "timestamp": "2026-02-15T06:34:06.918500+00:00"}
+{"message": "test message some scam word verify account", "is_scam": true, "timestamp": "2026-02-15T06:34:07.107710+00:00"}
+{"message": "You will be arrested! Send OTP!", "is_scam": true, "timestamp": "2026-02-15T06:34:07.320608+00:00"}

@@ -8,6 +8,10 @@ metadata:
     app.kubernetes.io/component: api
 spec:
   type: ClusterIP
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 3600
   selector:
     app.kubernetes.io/name: scamintelli
     app.kubernetes.io/component: api
@@ -35,3 +39,7 @@ spec:
       targetPort: 6379
       protocol: TCP
       name: redis
+    - port: 26379
+      targetPort: 26379
+      protocol: TCP
+      name: sentinel
