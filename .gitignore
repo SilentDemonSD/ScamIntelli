@@ -214,3 +214,6 @@ redis_data/
 docker/nginx/certs/*.pem
 docker/nginx/certs/*.key
 !docker/nginx/certs/.gitkeep
+
+#non local 
+submission_guideline.txt
