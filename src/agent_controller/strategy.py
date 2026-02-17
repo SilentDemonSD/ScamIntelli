@@ -341,7 +341,7 @@ async def _process_message_inner(
         message, session.session_id, session.messages
     )
 
-    if meta_result.is_probe and meta_result.probe_type:
+    if meta_result.is_probe and meta_result.probe_type and not session.scam_detected:
         session.extracted_intel = await extract_all_intelligence(
             message, session.extracted_intel
         )

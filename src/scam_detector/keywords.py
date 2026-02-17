@@ -34,6 +34,10 @@ THREAT_KEYWORDS: FrozenSet[str] = frozenset(
         "account will be blocked",
         "account compromised",
         "account hacked",
+        "account is blocked",
+        "account has been blocked",
+        "account is suspended",
+        "account has been suspended",
         "compromised",
         "hacked",
         "unauthorized access",
@@ -45,6 +49,7 @@ THREAT_KEYWORDS: FrozenSet[str] = frozenset(
         "fine",
         "penalty",
         "blacklisted",
+        "blocked",
         "suspended",
         "terminated",
         "frozen",
@@ -63,6 +68,9 @@ THREAT_KEYWORDS: FrozenSet[str] = frozenset(
         "cyber crime",
         "seized",
         "locked",
+        "fraud",
+        "bank fraud",
+        "scam",
     }
 )
 

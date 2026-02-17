@@ -192,7 +192,9 @@ async def honeypot_endpoint(
             "emailAddresses": intel.email_addresses,
         },
         "engagementMetrics": {
-            "totalMessagesExchanged": session.turn_count,
+            "totalMessagesExchanged": len(
+                [m for m in session.messages if m.get("role") in ("scammer", "agent")]
+            ),
             "engagementDurationSeconds": duration_seconds,
         },
         "agentNotes": agent_notes,

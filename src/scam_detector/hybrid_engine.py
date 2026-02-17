@@ -56,12 +56,21 @@ HARD_INDICATOR_PATTERNS = (
     re.compile(r"[a-zA-Z0-9._\-]+@[a-zA-Z]+(?!\.[a-zA-Z])"),
     re.compile(r"https?://\S+"),
     re.compile(r"(?:\+91[\s\-]?)?[6-9]\d{9}"),
+    re.compile(r"\b\d{4}[\s\-]?\d{4}[\s\-]?\d{4}[\s\-]?\d{4}\b"),
 )
 
 HARD_INDICATOR_PHRASES: FrozenSet[str] = frozenset(
     {
         "verify immediately",
+        "verify now",
         "account block",
+        "account is blocked",
+        "account has been blocked",
+        "account is suspended",
+        "account has been suspended",
+        "your account is blocked",
+        "your account blocked",
+        "your account is suspended",
         "urgent action",
         "send otp",
         "share otp",
@@ -73,6 +82,8 @@ HARD_INDICATOR_PHRASES: FrozenSet[str] = frozenset(
         "digital arrest",
         "transfer now",
         "pay immediately",
+        "pay now",
+        "bank fraud",
         "share your bank account",
         "bank account number",
         "share bank details",
@@ -251,9 +262,10 @@ class HybridScamDetectionEngine:
             or intent_score >= 0.5
             or (keyword_score >= 0.35 and (ml_conf >= 0.7 or ens_conf >= 0.7))
             or (keyword_score >= 0.4 and pattern_score >= 0.3)
+            or (keyword_score >= 0.35 and intent_score >= 0.25)
             or (url_threat_score >= 0.7 and keyword_score >= 0.2)
             or (ml_conf >= 0.85 and keyword_score >= 0.2)
-            or (has_hard and keyword_score >= 0.15 and (ml_conf >= 0.6 or ens_conf >= 0.6))
+            or (has_hard and keyword_score >= 0.15)
             or (has_hard and (ml_conf >= 0.75 or ens_conf >= 0.75))
         )
 

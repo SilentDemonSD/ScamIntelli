@@ -302,7 +302,7 @@ class MetaScamDetector:
     def _detect_systematic_testing(
         cls, message_lower: str, history: SessionProbeHistory
     ) -> float:
-        if len(history.message_timestamps) < 3:
+        if len(history.message_timestamps) < 6:
             return 0.0
 
         score = 0.0

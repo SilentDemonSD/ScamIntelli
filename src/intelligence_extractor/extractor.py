@@ -168,20 +168,21 @@ async def extract_bank_references(
         if cleaned not in references and cleaned not in phone_digits:
             references.append(cleaned)
 
-    if has_bank_context:
-        for match in account_matches:
-            if len(match) == 10 and match[0] in "6789":
-                continue
-            if match in phone_digits:
-                continue
-            if len(match) == 4:
-                try:
-                    if 1900 <= int(match) <= 2100:
-                        continue
-                except ValueError:
-                    pass
-            if len(match) >= 9 and match not in references:
-                references.append(match)
+    for match in account_matches:
+        if len(match) == 10 and match[0] in "6789":
+            continue
+        if match in phone_digits:
+            continue
+        if len(match) == 4:
+            try:
+                if 1900 <= int(match) <= 2100:
+                    continue
+            except ValueError:
+                pass
+        if len(match) >= 14 and match not in references:
+            references.append(match)
+        elif has_bank_context and len(match) >= 9 and match not in references:
+            references.append(match)
 
     return references
 

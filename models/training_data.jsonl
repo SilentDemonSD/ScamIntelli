@@ -3418,3 +3418,7 @@
 {"message": "Your SBI account is compromised. Call +91-9876543210.", "is_scam": true, "timestamp": "2026-02-17T12:52:11.874678+00:00"}
 {"message": "I have an SBI account for savings.", "is_scam": false, "timestamp": "2026-02-17T12:52:11.977278+00:00"}
 {"message": "Phishing: http://fake-site.com/steal", "is_scam": true, "timestamp": "2026-02-17T12:54:44.982636+00:00"}
+{"message": "Send OTP now! Final warning!", "is_scam": true, "timestamp": "2026-02-17T13:09:47.383251+00:00"}
+{"message": "Bank fraud: account 1111111111111111", "is_scam": true, "timestamp": "2026-02-17T13:23:57.846184+00:00"}
+{"message": "Scam message turn 4. Pay now!", "is_scam": true, "timestamp": "2026-02-17T13:26:52.728834+00:00"}
+{"message": "Scam message turn 5. Pay now!", "is_scam": true, "timestamp": "2026-02-17T13:26:52.905243+00:00"}
