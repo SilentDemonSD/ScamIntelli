@@ -7,6 +7,7 @@ from src.intelligence_extractor.extractor import (
     extract_phone_numbers,
     extract_upi_ids,
     has_sufficient_intelligence,
+    make_context_aware_probe,
 )
 from src.models import ExtractedIntelligence
 
@@ -110,3 +111,87 @@ async def test_has_sufficient_intelligence_false():
     result = await has_sufficient_intelligence(intel)
 
     assert result is False
+
+
+# ── Smoke tests for context-aware probing and extraction resilience ──
+
+
+def test_context_aware_probe_returns_question_when_intel_missing():
+    """Probe should return a targeted question when phone number is missing."""
+    messages = [
+        {"role": "scammer", "content": "Your account will be blocked immediately"},
+    ]
+    intel = ExtractedIntelligence()  # nothing extracted yet
+
+    probe = make_context_aware_probe(messages, intel, confidence=0.7)
+
+    assert probe is not None
+    assert "?" in probe or "batao" in probe
+
+
+def test_context_aware_probe_returns_none_when_intel_complete():
+    """Probe should return None when all intel types are already collected."""
+    intel = ExtractedIntelligence(
+        phone_numbers=["+919876543210"],
+        upi_ids=["fraud@ybl"],
+        email_addresses=["x@y.com"],
+        bank_accounts=["123456789"],
+    )
+    probe = make_context_aware_probe([], intel, confidence=0.9)
+    assert probe is None
+
+
+def test_context_aware_probe_handles_empty_messages():
+    """Probe should still return a clean question even when no messages exist."""
+    intel = ExtractedIntelligence()  # all intel missing
+    probe = make_context_aware_probe([], intel, confidence=0.6)
+    assert probe is not None
+    # Must not contain empty-quote artifacts like "'...'"
+    assert "'...'" not in probe
+    assert "''" not in probe
+
+
+def test_context_aware_probe_assertive_at_high_confidence():
+    """When confidence >= 0.8, templates with 'batao na?' should become assertive."""
+    intel = ExtractedIntelligence(phone_numbers=["+919876543210"])  # phone present, UPI missing → target = "UPI ID"
+    messages = [{"role": "scammer", "content": "Send money now"}]
+    probe = make_context_aware_probe(messages, intel, confidence=0.85)
+    assert probe is not None
+    assert "jaldi karna padega" in probe
+    assert "batao na?" not in probe
+
+
+def test_context_aware_probe_not_assertive_at_low_confidence():
+    """When confidence < 0.8, templates should keep the polite phrasing."""
+    intel = ExtractedIntelligence(phone_numbers=["+919876543210"])  # UPI missing
+    messages = [{"role": "scammer", "content": "Send money now"}]
+    probe = make_context_aware_probe(messages, intel, confidence=0.5)
+    assert probe is not None
+    assert "batao na?" in probe
+
+
+@pytest.mark.asyncio
+async def test_extract_all_intelligence_no_unhandled_exception():
+    """Extraction must never raise; partial failures return empty fields."""
+    # Even with garbage input, extract_all_intelligence should not throw
+    intel = await extract_all_intelligence("", ExtractedIntelligence())
+    assert isinstance(intel, ExtractedIntelligence)
+
+
+def test_context_aware_probe_prioritizes_phone_first():
+    """When all intel is missing, phone number should be the first target."""
+    intel = ExtractedIntelligence()
+    messages = [{"role": "scammer", "content": "Hello sir how are you"}]
+    probe = make_context_aware_probe(messages, intel, confidence=0.6)
+    assert probe is not None
+    # Phone is first in priority list → probe should ask about phone/number
+    assert "number" in probe.lower()
+
+
+def test_context_aware_probe_skips_to_next_when_phone_present():
+    """When phone is present but UPI is missing, probe should target UPI."""
+    intel = ExtractedIntelligence(phone_numbers=["+919876543210"])
+    messages = [{"role": "scammer", "content": "Send payment now"}]
+    probe = make_context_aware_probe(messages, intel, confidence=0.6)
+    assert probe is not None
+    assert "upi" in probe.lower()

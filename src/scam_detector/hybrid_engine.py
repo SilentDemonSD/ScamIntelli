@@ -29,6 +29,28 @@ class HybridDetectionResult:
     has_hard_indicators: bool
     detection_layers_used: List[str]
 
+    def get_red_flag_summary(self) -> Dict[str, Any]:
+        """Return top red-flag signals and their scores for upstream consumers.
+
+        Used by the agent strategy layer to decide which follow-up
+        questions to ask (e.g. if url_threat is high, ask about the link).
+        """
+        flags: List[Dict[str, Any]] = []
+        thresholds = {
+            "keyword": 0.3, "intent": 0.4, "behavioral": 0.3,
+            "url_threat": 0.5, "multi_vector": 0.3, "emotion": 0.4,
+        }
+        for signal, threshold in thresholds.items():
+            score = self.breakdown.get(signal, 0.0)
+            if score >= threshold:
+                flags.append({"signal": signal, "score": round(score, 4)})
+        flags.sort(key=lambda f: f["score"], reverse=True)
+        return {
+            "red_flags": flags,
+            "confidence": self.confidence,
+            "hard_indicators": self.has_hard_indicators,
+        }
+
 
 HARD_INDICATOR_PATTERNS = (
     re.compile(r"[a-zA-Z0-9._\-]+@[a-zA-Z]+(?!\.[a-zA-Z])"),
@@ -90,6 +112,7 @@ MULTI_VECTOR_PATTERNS: FrozenSet[str] = frozenset(
 
 
 class HybridScamDetectionEngine:
+    """Multi-layer scam detection combining keyword, intent, ML, and behavioral signals."""
 
     @classmethod
     async def detect(
@@ -107,7 +130,14 @@ class HybridScamDetectionEngine:
         scores["keyword"] = keyword_score
         layers_used.append("keyword")
 
-        if keyword_score < 0.1 and url_threat_score < 0.2 and emotional_score < 0.2:
+        has_hard_early = cls._has_hard_indicators(message)
+
+        if (
+            keyword_score < 0.1
+            and url_threat_score < 0.2
+            and emotional_score < 0.2
+            and not has_hard_early
+        ):
             return HybridDetectionResult(
                 is_scam=False,
                 confidence=round(keyword_score, 4),
@@ -205,7 +235,7 @@ class HybridScamDetectionEngine:
             stronger = max(ml_conf, ens_conf)
             final_score = max(final_score, stronger * 0.85)
 
-        has_hard = cls._has_hard_indicators(message)
+        has_hard = has_hard_early
 
         if final_score > 0.85 and not has_hard:
             final_score *= 0.82
@@ -223,6 +253,8 @@ class HybridScamDetectionEngine:
             or (keyword_score >= 0.4 and pattern_score >= 0.3)
             or (url_threat_score >= 0.7 and keyword_score >= 0.2)
             or (ml_conf >= 0.85 and keyword_score >= 0.2)
+            or (has_hard and keyword_score >= 0.15 and (ml_conf >= 0.6 or ens_conf >= 0.6))
+            or (has_hard and (ml_conf >= 0.75 or ens_conf >= 0.75))
         )
 
         try:

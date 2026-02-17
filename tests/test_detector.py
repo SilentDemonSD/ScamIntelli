@@ -102,3 +102,50 @@ def test_get_keyword_categories():
     assert "threat" in categories
     assert "payment" in categories
     assert "credential" in categories
+
+
+@pytest.mark.asyncio
+async def test_sbi_account_compromised_detected_as_scam():
+    """Regression: 'Your SBI account is compromised. Call +91-...' must be scam."""
+    from src.scam_detector.hybrid_engine import HybridScamDetectionEngine
+
+    message = "Your SBI account is compromised. Call +91-9876543210."
+    result = await HybridScamDetectionEngine.detect(message)
+
+    assert result.is_scam is True
+    assert result.confidence >= 0.7
+    assert result.has_hard_indicators is True
+
+
+@pytest.mark.asyncio
+async def test_bank_name_with_threat_keyword_detected():
+    """Bank name + threat keyword must produce keyword_score > 0."""
+    score, matched = await calculate_keyword_score(
+        "Your HDFC account has been hacked. Contact us immediately."
+    )
+
+    assert score > 0.1
+    assert any(kw in matched for kw in ("hdfc", "hacked"))
+
+
+@pytest.mark.asyncio
+async def test_hard_indicators_bypass_early_return():
+    """Messages with phone numbers should NOT be short-circuited by early gate."""
+    from src.scam_detector.hybrid_engine import HybridScamDetectionEngine
+
+    message = "Call +91-9876543210 for account verification."
+    result = await HybridScamDetectionEngine.detect(message)
+
+    assert len(result.detection_layers_used) > 1
+    assert result.has_hard_indicators is True
+
+
+@pytest.mark.asyncio
+async def test_benign_sbi_mention_not_scam():
+    """Casual mention of a bank should NOT trigger false positive."""
+    from src.scam_detector.hybrid_engine import HybridScamDetectionEngine
+
+    message = "I have an SBI account for savings."
+    result = await HybridScamDetectionEngine.detect(message)
+
+    assert result.is_scam is False

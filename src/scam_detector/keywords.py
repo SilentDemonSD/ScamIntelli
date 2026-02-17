@@ -32,6 +32,12 @@ THREAT_KEYWORDS: FrozenSet[str] = frozenset(
         "account blocked",
         "account suspended",
         "account will be blocked",
+        "account compromised",
+        "account hacked",
+        "compromised",
+        "hacked",
+        "unauthorized access",
+        "unauthorized transaction",
         "legal action",
         "police complaint",
         "case filed",
@@ -55,6 +61,8 @@ THREAT_KEYWORDS: FrozenSet[str] = frozenset(
         "under observation",
         "surveillance",
         "cyber crime",
+        "seized",
+        "locked",
     }
 )
 
@@ -370,6 +378,21 @@ INDIA_SPECIFIC_PATTERNS: FrozenSet[str] = frozenset(
         "state government",
         "pm scheme",
         "govt scheme",
+        "sbi",
+        "hdfc",
+        "icici",
+        "pnb",
+        "axis bank",
+        "kotak",
+        "canara",
+        "bob",
+        "union bank",
+        "indusind",
+        "yes bank",
+        "idbi",
+        "rbl",
+        "bandhan bank",
+        "federal bank",
     }
 )
 

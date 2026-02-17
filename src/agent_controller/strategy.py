@@ -7,6 +7,7 @@ from src.config import get_settings
 from src.intelligence_extractor.extractor import (
     extract_all_intelligence,
     has_sufficient_intelligence,
+    make_context_aware_probe,
 )
 from src.models import AgentReply, ExtractedIntelligence, PersonaStyle, SessionState
 from src.persona_engine.age_adaptive import AgeAdaptivePersonaEngine
@@ -42,8 +43,11 @@ settings = get_settings()
 
 
 class ConversationContextTracker:
+    """Analyzes recent messages to track scammer tactics and agent state."""
+
     @staticmethod
     def analyze_conversation_flow(messages: List[dict]) -> Dict[str, Any]:
+        """Derive urgency, threats, info requests and emotional state from recent messages."""
         context = {
             "scammer_urgency": 0,
             "agent_compliance_shown": 0,
@@ -154,6 +158,7 @@ class ConversationContextTracker:
 
     @staticmethod
     def get_contextual_response_hint(context: Dict[str, Any], turn_count: int) -> str:
+        """Produce a short hint string guiding the agent's next response tone."""
         hints = []
 
         if context["emotional_state"] == "fearful":
@@ -277,6 +282,40 @@ class EngagementStrategy:
 async def process_message(
     session: SessionState, message: str
 ) -> Tuple[SessionState, AgentReply]:
+    """Process an incoming scammer message, detect scams, extract intel, and reply.
+
+    Wrapped in a top-level safety net so that any uncaught exception still
+    returns a valid AgentReply rather than crashing the session.
+    """
+    try:
+        return await _process_message_inner(session, message)
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception(
+            "Unhandled error in process_message for session %s", session.session_id
+        )
+        # Return a safe fallback so the session isn't lost
+        fallback = "Ek minute sir, phone mein kuch dikkat aa rahi hai... abhi try karta hun."
+        session.messages.append({"role": "agent", "content": fallback,
+                                  "timestamp": datetime.now(timezone.utc).isoformat()})
+        try:
+            await update_session(session)
+        except Exception:
+            pass
+        return session, AgentReply(
+            status="success",
+            reply=fallback,
+            session_id=session.session_id,
+            scam_detected=session.scam_detected,
+            engagement_active=session.engagement_active,
+            confidence_score=0.0,
+        )
+
+
+async def _process_message_inner(
+    session: SessionState, message: str
+) -> Tuple[SessionState, AgentReply]:
+    """Core message processing logic, called by process_message with error safety."""
     jailbreak_result = AntiJailbreakLayer.sanitize_input(message)
     if jailbreak_result.is_jailbreak:
         session.extracted_intel = await extract_all_intelligence(
@@ -444,6 +483,17 @@ async def process_message(
         if url_threat_result.phishing_urls_found > 0:
             context_hint += "\nURL DETECTED: Scammer sent suspicious URL. DO NOT click. Pretend link doesn't work, ask for details verbally instead."
 
+        # Surface top red-flag signals so the agent can probe accordingly
+        red_flag_summary = hybrid_result.get_red_flag_summary()
+        if red_flag_summary["red_flags"]:
+            flag_names = ", ".join(f["signal"] for f in red_flag_summary["red_flags"][:3])
+            context_hint += f"\nACTIVE RED FLAGS: {flag_names}. Probe around these topics to elicit more intel."
+
+        # Tell the AI which intel is still missing so it can weave in probing naturally
+        missing_intel = _describe_missing_intel(session.extracted_intel)
+        if missing_intel:
+            context_hint += f"\nMISSING INTEL (try to extract naturally): {missing_intel}"
+
         reply_text = await generate_persona_response(
             persona_type,
             scam_cat,
@@ -481,16 +531,26 @@ async def process_message(
     else:
         reply_text = _generate_dynamic_non_scam_response(message, session)
 
+    _conf = hybrid_result.confidence if hybrid_result else 0.0
+
     if session.scam_detected and session.engagement_active:
-        intel_question = _get_intel_extraction_question(
-            session.turn_count, session.extracted_intel
+        # Use context-aware probe when confidence is high enough
+        probe = make_context_aware_probe(
+            session.messages,
+            session.extracted_intel,
+            confidence=_conf,
         )
-        if intel_question:
-            reply_text = f"{reply_text} {intel_question}"
+        if probe and _conf >= 0.5:
+            reply_text = f"{reply_text} {probe}"
+        else:
+            intel_question = _get_intel_extraction_question(
+                session.turn_count, session.extracted_intel
+            )
+            if intel_question:
+                reply_text = f"{reply_text} {intel_question}"
 
     session = await _update_state(session, reply_text, "agent")
 
-    _conf = hybrid_result.confidence if hybrid_result else 0.0
     session.confidence_level = _conf
 
     # Persist detection breakdown so /visualization has data immediately
@@ -621,7 +681,11 @@ _EMAIL_QUESTIONS = [
 def _get_intel_extraction_question(
     turn_count: int, intel,
 ) -> str:
-    """Returns an intelligence-extracting question at strategic turns."""
+    """Return an intel-eliciting question based on turn count and missing data.
+
+    Now covers all turns (not just 3-7) by cycling through missing intel
+    types so the agent keeps probing throughout the conversation.
+    """
     if turn_count == 3 and not intel.phone_numbers:
         return random.choice(_PHONE_QUESTIONS)
     if turn_count == 4 and not intel.upi_ids:
@@ -639,7 +703,37 @@ def _get_intel_extraction_question(
         if missing:
             items = " aur ".join(missing)
             return f"sir ek last thing, aapka {items} bhi de do."
+
+    # For turns 8+, keep cycling through missing intel types
+    if turn_count >= 8:
+        candidates = []
+        if not intel.phone_numbers:
+            candidates.append(random.choice(_PHONE_QUESTIONS))
+        if not intel.upi_ids:
+            candidates.append(random.choice(_UPI_QUESTIONS))
+        if not intel.email_addresses:
+            candidates.append(random.choice(_EMAIL_QUESTIONS))
+        if candidates:
+            # Rotate by turn to avoid repeating the same question back-to-back
+            return candidates[turn_count % len(candidates)]
+
     return ""
+
+
+def _describe_missing_intel(intel: ExtractedIntelligence) -> str:
+    """Build a human-readable summary of which intel types are still needed."""
+    missing = []
+    if not intel.phone_numbers:
+        missing.append("phone number")
+    if not intel.upi_ids:
+        missing.append("UPI ID")
+    if not intel.email_addresses:
+        missing.append("email address")
+    if not intel.bank_accounts:
+        missing.append("bank account number")
+    if not intel.phishing_links:
+        missing.append("any URLs/links they share")
+    return ", ".join(missing) if missing else ""
 
 
 def _generate_dynamic_non_scam_response(message: str, session: SessionState) -> str:

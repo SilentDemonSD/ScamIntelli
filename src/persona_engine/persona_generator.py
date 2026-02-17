@@ -1,3 +1,4 @@
+import logging
 import random
 
 from google import genai
@@ -5,6 +6,7 @@ from google import genai
 from src.config import get_settings
 from src.models import PersonaStyle, SessionState
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
@@ -61,7 +63,7 @@ async def generate_persona_response(
         try:
             return await _generate_ai_response(session, scammer_message)
         except Exception:
-            pass
+            logger.warning("AI response generation failed; falling back to templates")
 
     return await _generate_template_response(session)
 
