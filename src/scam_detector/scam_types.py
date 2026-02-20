@@ -40,7 +40,9 @@ SCAM_CATEGORY_KEYWORDS: Dict[ScamCategory, Set[str]] = {
         "cyber police",
         "cyber cell",
         "cbi",
-        "ed",
+        "ed notice",
+        "ed raid",
+        "ed investigation",
         "enforcement directorate",
         "narcotics",
         "money laundering",
@@ -65,6 +67,7 @@ SCAM_CATEGORY_KEYWORDS: Dict[ScamCategory, Set[str]] = {
         "kyc update",
         "kyc pending",
         "kyc expired",
+        "kyc verification",
         "verify account",
         "verify identity",
         "account blocked",
@@ -74,15 +77,29 @@ SCAM_CATEGORY_KEYWORDS: Dict[ScamCategory, Set[str]] = {
         "complete verification",
         "pan verification",
         "aadhaar link",
+        "aadhaar number",
+        "share aadhaar",
+        "share your aadhaar",
         "bank verification",
         "update details",
         "re-kyc",
         "ekyc",
         "video kyc",
+        "netbanking suspended",
+        "netbanking has been suspended",
+        "click here to verify",
+        "verify your",
+        "credentials",
+        "reactivate",
+        "has been suspended",
+        "account deactivated",
+        "verification expired",
+        "otp to unblock",
     },
     ScamCategory.BANK_FRAUD: {
         "bank account compromised",
         "sbi account",
+        "sbi netbanking",
         "hdfc account",
         "icici account",
         "account compromised",
@@ -98,8 +115,13 @@ SCAM_CATEGORY_KEYWORDS: Dict[ScamCategory, Set[str]] = {
         "share otp",
         "account number and otp",
         "netbanking blocked",
+        "netbanking suspended",
+        "bank account suspended",
     },
     ScamCategory.UPI_FRAUD: {
+        "upi",
+        "upi id",
+        "upi payment",
         "upi verification",
         "upi details",
         "verify your upi",
@@ -114,6 +136,7 @@ SCAM_CATEGORY_KEYWORDS: Dict[ScamCategory, Set[str]] = {
         "upi pin",
         "collect request",
         "pay to receive",
+        "send rs",
     },
     ScamCategory.PHISHING: {
         "click here",
@@ -131,6 +154,10 @@ SCAM_CATEGORY_KEYWORDS: Dict[ScamCategory, Set[str]] = {
         "iphone at",
         "fake-site",
         "malicious link",
+        "enter your credentials",
+        "verify your account",
+        "login to verify",
+        "click to verify",
     },
     ScamCategory.INVESTMENT_FRAUD: {
         "guaranteed returns",
@@ -439,6 +466,16 @@ SCAM_PROFILES: Dict[ScamCategory, ScamProfile] = {
 }
 
 
+import re
+
+
+def _kw_in_text(keyword: str, text: str) -> bool:
+    """Check if keyword appears in text with word-boundary awareness for short keywords."""
+    if len(keyword) <= 4:
+        return bool(re.search(r'\b' + re.escape(keyword) + r'\b', text))
+    return keyword in text
+
+
 def detect_scam_category(
     message: str, keywords: List[str]
 ) -> Tuple[ScamCategory, float]:
@@ -450,7 +487,7 @@ def detect_scam_category(
     for category, category_keywords in SCAM_CATEGORY_KEYWORDS.items():
         match_count = 0
         for kw in category_keywords:
-            if kw in message_lower:
+            if _kw_in_text(kw, message_lower):
                 match_count += 2
             elif kw in keywords_lower:
                 match_count += 1

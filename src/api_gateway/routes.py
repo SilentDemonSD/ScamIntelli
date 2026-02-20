@@ -174,11 +174,21 @@ async def _honeypot_endpoint_inner(
     x_api_key: Optional[str] = None,
 ):
 
-    message_text = (
-        request_body.message.get("text", "")
-        if isinstance(request_body.message, dict)
-        else request_body.message.text
-    )
+
+async def _honeypot_endpoint_inner(
+    request_body: HoneypotRequest,
+    request: Request,
+    x_api_key: Optional[str] = None,
+):
+
+    if isinstance(request_body.message, str):
+        message_text = request_body.message
+    elif isinstance(request_body.message, dict):
+        message_text = request_body.message.get("text", "")
+    elif hasattr(request_body.message, "text"):
+        message_text = request_body.message.text
+    else:
+        message_text = str(request_body.message)
     if not message_text:
         raise HTTPException(status_code=400, detail="Message text required")
 

@@ -47,7 +47,7 @@ def _get_pattern(name: str) -> re.Pattern:
     """
     if name not in _PATTERNS:
         patterns = {
-            "upi": re.compile(r"[a-zA-Z0-9._\-]+@[a-zA-Z]+", re.IGNORECASE),
+            "upi": re.compile(r"[a-zA-Z0-9._\-]+@[a-zA-Z0-9]+", re.IGNORECASE),
             "phone": re.compile(
                 r"(?<!\d)(?:\+91[\s\-]?)?[6-9]\d{9}(?!\d)"
                 r"|(?:\+91[\s\-]?[6-9]\d{3}[\s\-]?\d{3}[\s\-]?\d{3})(?!\d)"
@@ -121,6 +121,17 @@ BANK_CONTEXT_KEYWORDS: FrozenSet[str] = frozenset(
         "credited",
         "debited",
         "transaction",
+        "send",
+        "money",
+        "pay",
+        "paisa",
+        "rupees",
+        "deposit",
+        "savings",
+        "current",
+        "blocked",
+        "compromised",
+        "unauthorized",
     }
 )
 
@@ -234,7 +245,7 @@ async def extract_bank_references(
                     continue
             except ValueError:
                 pass
-        if len(match) >= 14 and match not in references:
+        if len(match) >= 11 and match not in references:
             references.append(match)
         elif has_bank_context and len(match) >= 9 and match not in references:
             references.append(match)
