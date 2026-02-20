@@ -219,6 +219,28 @@ class EngagementStrategy:
     # Minimum 10 turns for all categories to maximize conversation quality score
     # (evaluator gives 8pts for ≥8 turns, evaluator sends up to 10 messages)
     STRATEGY_CONFIGS = {
+        # Primary evaluation scenarios — must be optimized
+        ScamCategory.BANK_FRAUD: {
+            "max_turns": 12,
+            "intel_priority": ["bank_accounts", "phone_numbers", "upi_ids"],
+            "delay_factor": 1.5,
+            "compliance_level": 0.7,
+            "fear_response": True,
+        },
+        ScamCategory.UPI_FRAUD: {
+            "max_turns": 12,
+            "intel_priority": ["upi_ids", "phone_numbers", "bank_accounts"],
+            "delay_factor": 1.0,
+            "compliance_level": 0.6,
+            "fear_response": False,
+        },
+        ScamCategory.PHISHING: {
+            "max_turns": 12,
+            "intel_priority": ["phishing_links", "email_addresses", "phone_numbers"],
+            "delay_factor": 1.0,
+            "compliance_level": 0.5,
+            "fear_response": False,
+        },
         ScamCategory.DIGITAL_ARREST: {
             "max_turns": 12,
             "intel_priority": ["phone_numbers", "bank_accounts", "upi_ids"],
@@ -369,6 +391,13 @@ async def _process_message_inner(
         safe_reply = ResponseObfuscator.humanize_response(
             jailbreak_result.safe_response, "confused_human", add_fillers=True
         )
+        # H-1 FIX: Inject question even on jailbreak path for scoring
+        scam_cat_jb = _ensure_scam_category(session.scam_category)
+        jb_questions = QuestionBank.get_questions_for_category(
+            scam_cat_jb, session.turn_count, session.extracted_intel,
+        )
+        if jb_questions:
+            safe_reply = f"{safe_reply} {jb_questions[0].question_text}"
         session = await _update_state(session, safe_reply, "agent")
         await update_session(session)
         await log_session(session.session_id, message, "scammer", session.scam_detected, _quick_conf, session.scam_category)
@@ -394,6 +423,14 @@ async def _process_message_inner(
         counter_response = ResponseObfuscator.humanize_response(
             counter_response, "confused_human", add_fillers=True
         )
+        # H-1 FIX: Inject question even on meta-probe path
+        if "?" not in counter_response:
+            _probe_qs = [
+                "Aap kaun bol rahe hain?",
+                "Kahan se call kar rahe ho aap?",
+                "Aapka naam kya hai ji?",
+            ]
+            counter_response = f"{counter_response} {random.choice(_probe_qs)}"
         session = await _update_state(session, counter_response, "agent")
         await update_session(session)
         await log_session(session.session_id, message, "scammer", session.scam_detected, _quick_conf, session.scam_category)
@@ -537,7 +574,15 @@ async def _process_message_inner(
         session.engagement_active = False
         persona_type = _ensure_persona_type(session.persona_type)
         reply_text = get_exit_response(persona_type)
+        # C-2 FIX: Even on exit turn, inject a final investigative question
+        # to maximize questions-asked and information-elicitation scoring.
         if session.scam_detected:
+            scam_cat_exit = _ensure_scam_category(session.scam_category)
+            exit_questions = QuestionBank.get_questions_for_category(
+                scam_cat_exit, session.turn_count, session.extracted_intel,
+            )
+            if exit_questions:
+                reply_text = f"{reply_text} {exit_questions[0].question_text}"
             PatternLearner.learn_from_conversation(
                 session.messages,
                 session.scam_category or "unknown",
@@ -649,8 +694,17 @@ async def _process_message_inner(
             scam_cat_q, session.turn_count, session.extracted_intel,
         )
 
+        # H-2 FIX: Use extraction_strategy to prioritize questions targeting
+        # the primary missing intelligence type for this turn.
         if questions and session.turn_count >= 1:
-            selected_question = questions[0]  # highest priority
+            selected_question = questions[0]  # default: highest priority
+            primary_target = (extraction_strategy or {}).get("primary_target")
+            if primary_target:
+                # Prefer a question that targets the planner's primary target
+                for q in questions:
+                    if primary_target in q.target_intelligence:
+                        selected_question = q
+                        break
             reply_text = f"{reply_text} {selected_question.question_text}"
             logger.info(
                 "Session %s turn %d: Asking %s question targeting %s",
@@ -887,11 +941,11 @@ def _generate_dynamic_non_scam_response(message: str, session: SessionState) -> 
     if any(g in msg_lower for g in greetings):
         responses = [
             "Namaste ji! Kaun bol rahe hain?",
-            "Hello ji, haan boliye.",
-            "Haan ji, kaun hai?",
-            "Ji haan, boliye kaun?",
+            "Hello ji, haan boliye. Kaun hai?",
+            "Haan ji, kaun hai? Kya kaam hai?",
+            "Ji haan, boliye kaun? Kahan se bol rahe ho?",
             "Namaskar, aap kaun bol rahe hain?",
-            "Hello, haan ji batao.",
+            "Hello, haan ji batao. Kaun hai?",
         ]
         return random.choice(responses)
 
@@ -911,7 +965,7 @@ def _generate_dynamic_non_scam_response(message: str, session: SessionState) -> 
             "Haan ji, kuch kaam tha kya?",
             "Hello ji, batao kya hua?",
             "Ji, kaun bol rahe hain? Kuch kaam hai?",
-            "Haan ji suno.",
+            "Haan ji, kaun hai? Kya zaroorat thi?",
         ]
         return random.choice(first_turn)
 

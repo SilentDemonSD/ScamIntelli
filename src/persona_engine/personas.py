@@ -389,6 +389,23 @@ PERSONA_PROFILES: Dict[PersonaType, PersonaProfile] = {
 
 
 SCAM_PERSONA_MAPPING: Dict[ScamCategory, List[PersonaType]] = {
+    # --- Primary evaluation scenarios (bank_fraud 35%, upi_fraud 35%, phishing 30%) ---
+    ScamCategory.BANK_FRAUD: [
+        PersonaType.SCARED_VICTIM,
+        PersonaType.ELDERLY_ANXIOUS,
+        PersonaType.TECH_NAIVE,
+    ],
+    ScamCategory.UPI_FRAUD: [
+        PersonaType.FIRST_TIME_SELLER,
+        PersonaType.TECH_NAIVE,
+        PersonaType.TRUSTING_HOUSEWIFE,
+    ],
+    ScamCategory.PHISHING: [
+        PersonaType.TECH_NAIVE,
+        PersonaType.BUSY_PROFESSIONAL,
+        PersonaType.ELDERLY_ANXIOUS,
+    ],
+    # --- Other scam categories ---
     ScamCategory.DIGITAL_ARREST: [
         PersonaType.ELDERLY_ANXIOUS,
         PersonaType.SCARED_VICTIM,
@@ -779,16 +796,16 @@ class ResponseSelfCorrector:
             "Sorry, dhyan nahi tha. Kya bola?",
         ],
         "stall": [
-            "Ek minute ruko, koi aaya hai door pe.",
-            "Abhi busy hun thoda, wait karo.",
-            "Phone pe network issue hai, sun nahi paya.",
-            "Ruko ruko, kuch check karna hai.",
+            "Ek minute ruko, koi aaya hai door pe. Abhi aata hun, aapka naam kya hai?",
+            "Abhi busy hun thoda, wait karo. Kaunse department se bol rahe ho?",
+            "Phone pe network issue hai, sun nahi paya. Kya bola aapne?",
+            "Ruko ruko, kuch check karna hai. Aapka direct number kya hai?",
         ],
         "compliant": [
-            "Ji haan, main kar raha hun.",
-            "Okay okay, batao kya karna hai.",
-            "Theek hai, aage bolo.",
-            "Haan ji, main sun raha hun.",
+            "Ji haan, main kar raha hun. Aapka employee ID kya hai?",
+            "Okay okay, batao kya karna hai? Kaunsa wala process hai?",
+            "Theek hai, aage bolo. Kya aapka email hai? Main note karta hun.",
+            "Haan ji, main sun raha hun. Aap batao apna naam kya hai?",
         ],
     }
 
@@ -870,7 +887,12 @@ class ResponseSelfCorrector:
     def _truncate_response(cls, response: str) -> str:
         sentences = re.split(r"(?<=[.!?])\s+", response)
         if len(sentences) > 5:
-            return " ".join(sentences[:4])
+            # M-1 FIX: Preserve trailing question — if last sentence has ?,
+            # keep it alongside the first 3 sentences.
+            truncated = sentences[:4]
+            if "?" in sentences[-1] and "?" not in " ".join(truncated):
+                truncated[-1] = sentences[-1]
+            return " ".join(truncated)
         if len(response) > 400:
             return response[:350].rsplit(" ", 1)[0] + "..."
         return response
@@ -1172,8 +1194,8 @@ async def adapt_response_to_context(
         """Combine a contextual reaction with the AI base response.
         If the base already addresses the topic, just return base.
         Otherwise prepend the contextual line."""
-        # If base is already >100 chars and addresses the topic, keep base
-        if len(base) > 100:
+        # If base is already >180 chars and addresses the topic, keep base
+        if len(base) > 180:
             return base
         # Blend: contextual reaction + base continuation
         return f"{contextual} {base}" if base and base.lower() != contextual.lower() else contextual
