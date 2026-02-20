@@ -351,6 +351,15 @@ async def _process_message_inner(
     session: SessionState, message: str
 ) -> Tuple[SessionState, AgentReply]:
     """Core message processing logic, called by process_message with error safety."""
+
+    # Run lightweight scam detection upfront so even early-exit paths
+    # (jailbreak, probe) get an authentic detection result for logging.
+    from src.scam_detector.classifier import detect_scam as _detect_scam_quick
+    _quick_result = await _detect_scam_quick(message)
+    _quick_conf = _quick_result.total_score
+    if _quick_result.is_scam and not session.scam_detected:
+        session.scam_detected = True
+
     jailbreak_result = AntiJailbreakLayer.sanitize_input(message)
     if jailbreak_result.is_jailbreak:
         session.extracted_intel = await extract_all_intelligence(
@@ -362,14 +371,14 @@ async def _process_message_inner(
         )
         session = await _update_state(session, safe_reply, "agent")
         await update_session(session)
-        await log_session(session.session_id, message, "scammer", session.scam_detected, 0.0, session.scam_category)
+        await log_session(session.session_id, message, "scammer", session.scam_detected, _quick_conf, session.scam_category)
         return session, AgentReply(
             status="success",
             reply=safe_reply,
             session_id=session.session_id,
             scam_detected=session.scam_detected,
             engagement_active=session.engagement_active,
-            confidence_score=0.0,
+            confidence_score=round(_quick_conf, 4),
         )
 
     meta_result = MetaScamDetector.analyze(
@@ -387,14 +396,14 @@ async def _process_message_inner(
         )
         session = await _update_state(session, counter_response, "agent")
         await update_session(session)
-        await log_session(session.session_id, message, "scammer", session.scam_detected, 0.0, session.scam_category)
+        await log_session(session.session_id, message, "scammer", session.scam_detected, _quick_conf, session.scam_category)
         return session, AgentReply(
             status="success",
             reply=counter_response,
             session_id=session.session_id,
             scam_detected=session.scam_detected,
             engagement_active=session.engagement_active,
-            confidence_score=0.0,
+            confidence_score=round(_quick_conf, 4),
         )
 
     async def _run_emotional_analysis():

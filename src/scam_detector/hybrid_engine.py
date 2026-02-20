@@ -161,9 +161,9 @@ class HybridScamDetectionEngine:
         has_hard_early = cls._has_hard_indicators(message)
 
         if (
-            keyword_score < 0.1
-            and url_threat_score < 0.2
-            and emotional_score < 0.2
+            keyword_score < 0.05
+            and url_threat_score < 0.1
+            and emotional_score < 0.1
             and not has_hard_early
         ):
             return HybridDetectionResult(
@@ -268,22 +268,27 @@ class HybridScamDetectionEngine:
         if final_score > 0.85 and not has_hard:
             final_score *= 0.82
 
-        if has_hard and final_score > 0.3:
-            final_score = max(final_score, 0.72)
+        if has_hard:
+            # Hard indicators (UPI, phone, suspicious URL, 16-digit card)
+            # always warrant a minimum confidence floor
+            final_score = max(final_score, 0.70)
 
         if multi_vector > 0.5:
             final_score = max(final_score, 0.8)
 
         is_scam = (
-            final_score >= 0.65
-            or intent_score >= 0.5
-            or (keyword_score >= 0.35 and (ml_conf >= 0.7 or ens_conf >= 0.7))
-            or (keyword_score >= 0.4 and pattern_score >= 0.3)
-            or (keyword_score >= 0.35 and intent_score >= 0.25)
-            or (url_threat_score >= 0.7 and keyword_score >= 0.2)
-            or (ml_conf >= 0.85 and keyword_score >= 0.2)
-            or (has_hard and keyword_score >= 0.15)
-            or (has_hard and (ml_conf >= 0.75 or ens_conf >= 0.75))
+            final_score >= 0.55
+            or intent_score >= 0.4
+            or keyword_score >= 0.5
+            or (keyword_score >= 0.25 and (ml_conf >= 0.6 or ens_conf >= 0.6))
+            or (keyword_score >= 0.3 and pattern_score >= 0.2)
+            or (keyword_score >= 0.25 and intent_score >= 0.2)
+            or (url_threat_score >= 0.5 and keyword_score >= 0.1)
+            or (ml_conf >= 0.75 and keyword_score >= 0.1)
+            or (has_hard and keyword_score >= 0.1)
+            or (has_hard and (ml_conf >= 0.6 or ens_conf >= 0.6))
+            or has_hard  # Hard indicators (UPI/phone/link/16-digit) always indicate scam
+            or (ml_conf >= 0.8 or ens_conf >= 0.8)  # Strong ML consensus
         )
 
         try:
