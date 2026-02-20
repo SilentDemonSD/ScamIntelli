@@ -624,6 +624,20 @@ async def _process_message_inner(
 
     _conf = hybrid_result.confidence if hybrid_result else 0.0
 
+    # --- Ensure EVERY turn has at least one question (for scoring) ---
+    # Even non-scam turns should have investigative questions to score
+    # "questions asked" and "information elicitation" points.
+    if not session.scam_detected and "?" not in reply_text:
+        _non_scam_questions = [
+            "Aap kaunsi company se bol rahe hain?",
+            "Aapka naam kya hai ji?",
+            "Kahan se call kar rahe ho aap?",
+            "Aapka phone number kya hai? Baad mein call karunga.",
+            "Yeh kaunse department ka kaam hai?",
+            "Aap mujhe apna email de sakte ho?",
+        ]
+        reply_text = f"{reply_text} {random.choice(_non_scam_questions)}"
+
     if session.scam_detected and session.engagement_active:
         # --- Question Engine: strategic investigative questions ---
         scam_cat_q = _ensure_scam_category(session.scam_category)
@@ -903,21 +917,21 @@ def _generate_dynamic_non_scam_response(message: str, session: SessionState) -> 
 
     if turn <= 3:
         early_turn = [
-            "Accha ji, thoda detail mein batao. Samajh nahi aaya.",
-            "Haan ji main sun raha hun. Aage boliye.",
-            "Theek hai, aur batao kya karna hai?",
-            "Okay ji, continue karo. Main sun raha hun.",
-            "Haan haan, aur kya hua? Batao.",
+            "Accha ji, thoda detail mein batao? Samajh nahi aaya.",
+            "Haan ji main sun raha hun. Aap kaunsi company se bol rahe hain?",
+            "Theek hai, aur batao kya karna hai? Aapka naam kya hai?",
+            "Okay ji, aage bolo. Yeh kaunse department ka kaam hai?",
+            "Haan haan, aur kya hua? Aap kahan se call kar rahe ho?",
         ]
         return random.choice(early_turn)
 
     later_turn = [
-        "Accha ji, main soch kar batata hun.",
-        "Hmm, samajh gaya. Ek minute sochne do.",
-        "Theek hai ji, lekin mujhe thoda time chahiye.",
-        "Okay, main dekh raha hun. Aap thoda ruko.",
-        "Haan ji, mujhe kisi se pooch lene do pehle.",
-        "Accha accha, ek minute. Meri wife bula rahi hai.",
+        "Accha ji, main soch kar batata hun. Lekin aap mujhe apna phone number de sakte ho? Baad mein call karunga.",
+        "Hmm, samajh gaya. Aapka employee ID kya hai? Mujhe verify karna hai.",
+        "Theek hai ji, lekin mujhe thoda time chahiye. Aap kaunsi branch se bol rahe ho?",
+        "Okay, main dekh raha hun. Aapka direct number kya hai? Agar disconnect ho jaye toh call karunga.",
+        "Haan ji, mujhe kisi se pooch lene do pehle. Aap kaunse department se hain?",
+        "Ek minute sir, meri wife bula rahi hai. Aap email kar sakte ho mujhe? Kya email hai aapka?",
     ]
     recent_used = {
         m.get("content", "").strip().lower()

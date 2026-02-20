@@ -807,10 +807,10 @@ class ResponseSelfCorrector:
             if re.search(p, response_lower, re.IGNORECASE)
         )
 
-        if len(response) > 200:
+        if len(response) > 500:
             issues.append("too_long")
 
-        if len(re.findall(r"[.!?]+", response)) > 3:
+        if len(re.findall(r"[.!?]+", response)) > 6:
             issues.append("too_many_sentences")
 
         profile = PERSONA_PROFILES.get(
@@ -869,10 +869,10 @@ class ResponseSelfCorrector:
     @classmethod
     def _truncate_response(cls, response: str) -> str:
         sentences = re.split(r"(?<=[.!?])\s+", response)
-        if len(sentences) > 2:
-            return " ".join(sentences[:2])
-        if len(response) > 150:
-            return response[:100].rsplit(" ", 1)[0] + "..."
+        if len(sentences) > 5:
+            return " ".join(sentences[:4])
+        if len(response) > 400:
+            return response[:350].rsplit(" ", 1)[0] + "..."
         return response
 
     @classmethod
@@ -1041,24 +1041,31 @@ CRITICAL RULES:
 2. NEVER mention AI, bot, honeypot, system, or that you're testing
 3. Adapt your language based on scammer's language style - if they speak formal English, respond in Hinglish showing slight confusion
 4. Show GENUINE emotions: fear for arrest scams, greed for lottery, confusion for tech issues
-5. Ask naive questions to extract more info (phone number, UPI, bank details, links)
-6. Delay giving sensitive information but ALWAYS seem willing eventually
-7. Keep responses SHORT (1-2 sentences max, like real SMS/WhatsApp)
-8. Include realistic hesitations: "umm", "ek minute", "wait wait"
-9. For elderly/low-tech personas: use simpler words, more confusion
+5. Ask naive questions that a REAL confused victim would ask - about the process, why this is happening, what the consequences are, who they can verify with
+6. Delay giving sensitive information but ALWAYS seem willing eventually - create realistic obstacles (phone is slow, need glasses, battery dying, need to find card/diary)
+7. Keep responses 2-4 sentences (like real WhatsApp/SMS). Include a reaction + a stalling excuse or naive question. Never just one word.
+8. Include realistic hesitations: "umm", "ek minute", "wait wait", "haan haan"
+9. For elderly/low-tech personas: use simpler words, more confusion, ask them to repeat/explain
 10. Make it feel like a REAL conversation - not scripted
 
-ANTI-REPETITION RULES (VERY IMPORTANT):
-11. READ the conversation history above CAREFULLY. NEVER repeat or paraphrase anything you already said.
-12. If stuck, create a COMPLETELY NEW excuse, question, or distraction. Do NOT reuse "ek minute", "ruko", "dhundh raha hun" if already said before.
-13. Track what excuses/stalls you've used. Each response must be UNIQUE in wording AND meaning.
-14. Vary your sentence structure, length, and tone across turns.
+ANTI-ECHO/ANTI-PARROTING RULES (HIGHEST PRIORITY):
+11. NEVER quote, echo, or repeat back the scammer's words. Do NOT say "Aapne kaha...", "Sir aapne bola...", "You said...", or reference their exact message text in any way.
+12. React to the MEANING of what they said, not the exact words. A real person would respond emotionally, NOT by quoting back what was said.
+13. READ the conversation history above. NEVER repeat or paraphrase anything you already said in previous turns.
+14. Each response MUST be UNIQUE in wording, structure, and meaning. Use completely new excuses, questions, or reactions every turn.
+15. Vary your sentence structure, length, and emotional tone across turns.
 
 CONTEXT AWARENESS RULES:
-15. Pay close attention to EXACTLY what the scammer is asking for RIGHT NOW. If they ask for OTP, talk about OTP specifically - NOT password or PIN.
-16. If the scammer mentions a specific topic (OTP, payment, link, etc.), your response MUST address that exact topic.
-17. Maintain continuity with what you said in previous messages. If you said "abhi dhundh raha hun", follow up on that action.
-18. NEVER contradict yourself - if you said "bank jaana padega", don't suddenly say "already bank mein hun" unless time has passed.
+16. Pay close attention to EXACTLY what the scammer is asking for RIGHT NOW. If they ask for OTP, talk about OTP specifically - NOT password or PIN.
+17. If the scammer mentions a specific topic (OTP, payment, link, etc.), your response MUST address that exact topic with a realistic reaction.
+18. Maintain continuity with what you said in previous messages. If you said "abhi dhundh raha hun", follow up on that action.
+19. NEVER contradict yourself - if you said "bank jaana padega", don't suddenly say "already bank mein hun" unless time has passed.
+
+RESPONSE STRATEGY:
+20. Every response should have TWO parts: (a) emotional reaction or stalling excuse + (b) a naive question to keep the scammer talking and extract intel.
+21. Ask questions a REAL victim would ask: "Kaun si branch se bol rahe hain?", "Aapka naam kya hai?", "Yeh kaise verify karun?", "Aap mujhe official email bhej sakte hain?"
+22. Show increasing anxiety/urgency as conversation progresses - this is psychologically realistic and keeps scammers invested.
+23. Create believable delays: phone is slow, need to find reading glasses, someone at the door, need to check with family member, network issues.
 
 RECENT CONVERSATION:
 {history_text}
@@ -1077,6 +1084,25 @@ Generate ONE short, realistic response as this persona. Just the response text, 
     for quote in ('"', "'"):
         if text.startswith(quote) and text.endswith(quote):
             text = text[1:-1]
+
+    # Guard: if Gemini returned JSON instead of plain text, extract the reply
+    if text.startswith('{'):
+        import json as _json
+        with suppress(Exception):
+            parsed = _json.loads(text)
+            if isinstance(parsed, dict):
+                text = str(
+                    parsed.get('reply', '')
+                    or parsed.get('response', '')
+                    or parsed.get('text', '')
+                    or parsed.get('message', '')
+                ) or text
+
+    # Strip any trailing JSON blobs that Gemini may have appended
+    json_start = text.find('{"')
+    if json_start > 20:
+        text = text[:json_start].rstrip()
+
     return text
 
 
@@ -1119,14 +1145,18 @@ async def adapt_response_to_context(
     conversation_history: list = None,
     turn_count: int = 0,
 ) -> str:
+    """Enrich the AI response with contextual reactions when the scammer asks
+    for specific sensitive items (OTP, PIN, password, CVV, payment, etc.).
+
+    Key principle: BLEND contextual reactions with the AI response instead of
+    replacing it entirely. The AI-generated response has personality and context;
+    the template adds realistic stalling/delay/fear behavior.
+    """
     scam_category = _ensure_scam_category(scam_category)
     scammer_lower = scammer_message.lower()
     scammer_lang = detect_scammer_language(scammer_message)
 
     is_formal = scammer_lang == LanguageStyle.FORMAL_ENGLISH
-
-    if turn_count in (3, 4, 5, 7):
-        return base_response
 
     used_responses = set()
     if conversation_history:
@@ -1137,6 +1167,16 @@ async def adapt_response_to_context(
     def _pick_unique(pool: list) -> str:
         available = [r for r in pool if r.strip().lower() not in used_responses]
         return random.choice(available) if available else random.choice(pool)
+
+    def _blend(contextual: str, base: str) -> str:
+        """Combine a contextual reaction with the AI base response.
+        If the base already addresses the topic, just return base.
+        Otherwise prepend the contextual line."""
+        # If base is already >100 chars and addresses the topic, keep base
+        if len(base) > 100:
+            return base
+        # Blend: contextual reaction + base continuation
+        return f"{contextual} {base}" if base and base.lower() != contextual.lower() else contextual
 
     otp_keywords = ["otp", "one time", "verification code", "code bhejo", "otp batao", "otp bhejo"]
     pin_keywords = ["pin", "atm pin", "mpin"]
@@ -1152,124 +1192,124 @@ async def adapt_response_to_context(
         if has_otp:
             if is_formal:
                 delays = [
-                    "Sir, ek minute. OTP dhundh raha hun messages mein...",
-                    "Which OTP sir? Bahut saare messages aaye hain.",
-                    "Sir OTP aaya tha lekin delete ho gaya shayad...",
-                    "Sir please hold, OTP ke liye messages check kar raha hun.",
-                    "Arey haan OTP aaya tha, ruko dhundh raha hun.",
-                    "Sir OTP wala message kahan gaya, inbox full hai.",
-                    "One second sir, OTP dekhna hai notification mein.",
-                    "Sir bahut saare OTP aate rehte hain, konsa wala?",
+                    "Sir ek minute, OTP dhundh raha hun messages mein. Bahut saare messages aaye hain, konsa wala chahiye aapko exactly?",
+                    "Which OTP sir? Bahut saare OTP aate rehte hain mujhe. Aap bataoge konsi bank se aaya hai toh dhundh lunga.",
+                    "Sir OTP aaya tha lekin inbox mein 200+ messages hain. Aapka naam kya hai sir, main note karta hun tab tak.",
+                    "Sir phone slow hai bahut, messages load ho rahe hain. Aap kaunse department se bol rahe hain waise?",
+                    "Haan haan OTP dhundh raha hun, ek minute sir. Bataiye aapka employee ID kya hai, main apne records mein save karunga.",
+                    "Sir OTP wala message mil nahi raha, inbox full hai. Kya aap apna direct number de sakte hain? Agar call cut ho jaye toh main wapas call karunga.",
+                    "One second sir, notification clear kar raha hun OTP ke liye. Aap kaunsi branch se bol rahe hain waise?",
+                    "Sir bahut saare OTP aaye hain, konsa wala batao? Kya aap mujhe email pe bhi confirm bhej sakte hain?",
                 ]
             else:
                 delays = [
-                    "Ek minute, OTP dhundh raha hun messages mein...",
-                    "Konsa OTP? Bahut saare messages aaye hain.",
-                    "OTP wala message kahan gaya? Ruko dekho...",
-                    "Phone mein bahut messages hain, OTP dhundh raha hun.",
-                    "Arey haan OTP aaya tha, notification mein dekho ruko.",
-                    "OTP expire toh nahi ho gaya? Check karta hun.",
-                    "Ruko ruko, OTP ke liye message khol raha hun.",
-                    "OTP... haan ek second, inbox mein dhundh raha hun.",
+                    "Ek minute, OTP dhundh raha hun messages mein. Bahut saare messages hain, konsa wala chahiye?",
+                    "Konsa OTP? Bahut saare messages aaye hain. Batao konsi bank se bheja hai, dhundh leta hun.",
+                    "OTP wala message kahan gaya? Inbox mein 200+ messages hain. Tumhara naam kya hai waise?",
+                    "Phone mein bahut messages hain, OTP dhundh raha hun. Tumhara direct number de do, agar call cut ho jaye toh.",
+                    "Haan haan OTP aaya tha, ruko dhundh raha hun. Kaunsi branch se bol rahe ho waise?",
+                    "OTP expire toh nahi ho gaya? Check karta hun. Tumhara email ID kya hai, confirmation bhejo uspe.",
+                    "Ruko ruko, OTP ke liye message khol raha hun. Waise tumhara badge number kya hai?",
+                    "OTP dhundh raha hun inbox mein. Kaunsa department hai tumhara? Main apne bete ko bhi bataunga.",
                 ]
         elif has_pin:
             if is_formal:
                 delays = [
-                    "Sir, ATM PIN yaad nahi aa raha, sochne do.",
-                    "PIN toh bahut purana hai sir, diary mein likha tha.",
-                    "Sir ek minute, PIN change kiya tha recently.",
-                    "Konsa PIN sir? ATM wala ya phone wala?",
-                    "Sir PIN kahin likha tha, dhundh raha hun.",
-                    "PIN... haan sir, ek second sochne do.",
+                    "Sir ATM PIN yaad nahi aa raha, diary mein likha tha kahin. Aap kaunsi bank se bol rahe hain waise?",
+                    "PIN toh bahut purana hai sir, change kiya tha recently. Aapka naam aur employee ID batao, main note karta hun.",
+                    "Sir konsa PIN? ATM wala ya phone wala? Aap apna direct number do, main dhundh ke call karta hun.",
+                    "Sir PIN kahin note kiya tha, diary dhundh raha hun. Aap kaunse department se hain? Branch ka naam batao.",
+                    "PIN... haan sir, ek second sochne do. Waise aap mujhe email pe official letter bhej sakte hain?",
+                    "Sir PIN yaad nahi, bank jaake reset karwa lunga kya? Nearest branch ka address batao na.",
                 ]
             else:
                 delays = [
-                    "PIN yaad nahi aa raha, sochne do...",
-                    "PIN toh bahut purana hai, diary mein likha tha kahin.",
-                    "Konsa PIN? ATM wala ya UPI wala?",
-                    "Ek minute, PIN change kiya tha, naya yaad nahi.",
-                    "PIN kahin note kiya tha, ruko dhundhta hun.",
-                    "PIN... haan ruko sochne do ek second.",
+                    "PIN yaad nahi aa raha, diary mein likha tha kahin. Kaunsi bank se bol rahe ho waise?",
+                    "PIN toh bahut purana hai, change kiya tha. Tumhara naam aur ID batao, note karta hun.",
+                    "Konsa PIN? ATM wala ya UPI wala? Direct number de do, dhundh ke wapas call karunga.",
+                    "PIN kahin note kiya tha, ruko dhundhta hun. Kaunsa department hai tumhara?",
+                    "PIN... haan ruko sochne do. Waise email pe details bhej sakte ho? mera email hai...",
+                    "PIN yaad nahi, bank jaake reset karwa lun kya? Branch kaunsi hai tumhari?",
                 ]
         elif has_password:
             if is_formal:
                 delays = [
-                    "Sir, password kahin note kiya tha, let me check.",
-                    "Password bahut complex rakha tha sir, yaad karna padega.",
-                    "Sir ek minute, password diary mein likha hai.",
-                    "Password toh change kiya tha recently sir.",
-                    "Sir password wala file computer mein hai, ruko.",
-                    "Haan sir password... ek second diary nikalta hun.",
+                    "Sir password kahin note kiya tha, let me check diary. Waise aap kaunse department se hain? Employee ID batao.",
+                    "Password bahut complex rakha tha sir, yaad karna padega. Aap apna direct number do, password milne pe call karunga.",
+                    "Sir ek minute, password diary mein likha hai. Kya aap mujhe email pe link bhej sakte hain verify karne ke liye?",
+                    "Password toh change kiya tha recently sir, yaad nahi aa raha. Aapka naam kya hai exactly? Record ke liye chahiye.",
+                    "Sir password wala file computer mein hai, start hone mein time lagega. Waise aapki company ka office kahan hai?",
+                    "Haan sir password dhundh raha hun diary mein. Aap bataoge aapka official email kya hai, main wahan confirm bhejunga?",
                 ]
             else:
                 delays = [
-                    "Password kahin likha tha, ruko dhundhta hun.",
-                    "Password bahut complex hai, yaad karna padega.",
-                    "Ek minute, password diary mein hai kahin.",
-                    "Password toh change kiya tha, naya yaad nahi.",
-                    "Ruko password wali file dhundh raha hun.",
-                    "Password... haan ek second, sochne do.",
+                    "Password kahin likha tha, diary mein dhundh raha hun. Kaunse department se bol rahe ho waise?",
+                    "Password bahut complex hai, yaad karna padega. Tumhara direct number de do, milne pe call karunga.",
+                    "Password diary mein hai kahin, ruko dhundhta hun. Email pe bhi bhej sakte ho details?",
+                    "Password toh change kiya tha, naya yaad nahi. Tumhara naam kya hai pura? Record mein likhna hai.",
+                    "Password wali file computer mein hai, start ho raha hai. Tumhara office kahan hai waise?",
+                    "Password dhundh raha hun, ek second. Tumhara official email kya hai, wahan pe confirm bhejna padega.",
                 ]
         else:  # CVV
             if is_formal:
                 delays = [
-                    "Sir, card pe peeche ka number dekhna padega.",
-                    "CVV kya hota hai sir? Card ke peeche wala?",
-                    "Sir card purse mein hai, nikalta hun ruko.",
-                    "CVV... sir yeh safe hai batana? Bank toh mana karta hai.",
-                    "Ek minute sir, card dhundh raha hun wallet mein.",
-                    "Sir card kahin rakha tha, dhundh raha hun.",
+                    "Sir card pe peeche ka number dekhna padega, wallet mein dhundh raha hun. Aap kaunsi bank se bol rahe hain waise?",
+                    "CVV kya hota hai sir? Card ke peeche 3 digit wala? Bank toh mana karta hai yeh share karne se. Aapka employee ID kya hai?",
+                    "Sir card purse mein hai, nikalta hun ek minute. Waise aapka direct phone number de do, card milne pe call karunga.",
+                    "CVV batana safe hai kya sir? Meri beti kehti hai kabhi share mat karo. Aap mujhe email pe official proof bhejo na.",
+                    "Ek minute sir, card dhundh raha hun wallet mein. Aapki branch ka address kya hai? Main personally jaake verify bhi kar sakta hun.",
+                    "Sir card kahin safe mein rakha hai, dhundh raha hun. Aapka naam kya hai pura, main bank ko call karke confirm karunga.",
                 ]
             else:
                 delays = [
-                    "Card pe peeche ka number dekhna padega, ruko.",
-                    "CVV kya hota hai? Card ke peeche wala?",
-                    "Card purse mein hai, nikalta hun ek minute.",
-                    "CVV... yeh batana safe hai na? Bank wale mana karte hain.",
-                    "Card dhundh raha hun wallet mein, ruko.",
-                    "Card kahin rakha tha... haan ruko dhundhta hun.",
+                    "Card pe peeche ka number dekhna padega, wallet mein dhundh raha hun. Kaunsi bank se bol rahe ho waise?",
+                    "CVV kya hota hai? Card ke 3 digit wala? Bank mana karta hai share karne se. Tumhara ID number kya hai?",
+                    "Card purse mein hai, nikalta hun ek minute. Direct number de do, card milne pe call karunga.",
+                    "CVV batana safe hai na? Meri beti kehti hai mat batao. Email pe official proof bhejo pehle.",
+                    "Card dhundh raha hun wallet mein, ruko. Branch ka address kya hai? Main personally verify karwa lunga.",
+                    "Card safe mein hai kahin, dhundh raha hun. Tumhara pura naam batao, bank ko call karke confirm karunga.",
                 ]
-        return _pick_unique(delays)
+        return _blend(_pick_unique(delays), base_response)
 
     if any(kw in scammer_lower for kw in ["upi", "transfer", "send", "pay", "amount", "paisa", "money", "bhejo"]):
         if is_formal:
             stalls = [
-                "Sir, kitna amount transfer karna hai exactly?",
-                "Okay sir, but what is your UPI ID?",
-                "Let me check my account balance first sir.",
-                "Sir, aaj ka limit cross ho gaya. Tomorrow okay?",
-                "Sir konse account mein bhejun? Details batao.",
-                "Sir bank app open kar raha hun, ek minute lagega.",
-                "Amount bataiye sir, balance check karke batata hun.",
-                "Sir abhi bank se message aaya, maintenance chal rahi hai.",
+                "Sir kitna amount transfer karna hai exactly? Aur yeh UPI ID kiske naam pe registered hai?",
+                "Okay sir, aapka UPI ID kya hai? Main pehle small amount bhejke verify karna chahta hun.",
+                "Sir account mein balance check kar leta hun pehle. Aapka direct phone number de do backup ke liye.",
+                "Sir aaj ki transfer limit cross ho gayi hai, kal subah karenge. Aapka office address bataiye record ke liye.",
+                "Sir konse account mein bhejun? Bank details batao, aur aapka employee ID bhi note kar leta hun.",
+                "Sir bank app open kar raha hun, ek minute lagega. Waise yeh payment kaunse company ke liye hai? GST number hai?",
+                "Amount bataiye sir, balance check karke batata hun. Aap mujhe official email se invoice bhej do.",
+                "Sir abhi bank se message aaya maintenance chal rahi hai. Aapka naam kya hai pura, record mein likhna hai.",
             ]
         else:
             stalls = [
-                "Kitna bhejne ka hai exactly?",
-                "UPI ID kya hai aapka?",
-                "Account mein balance check karna padega.",
-                "Limit cross ho gayi hai aaj ki, kal chalega?",
-                "Konse account mein bhejna hai? Details do.",
-                "Bank app open kar raha hun, ek minute.",
-                "Kitna amount? Balance dekhke batata hun.",
-                "Abhi bank ki app mein maintenance chal rahi, wait karo.",
+                "Kitna bhejne ka hai exactly? Aur yeh UPI ID kiske naam pe hai?",
+                "UPI ID kya hai tumhara? Pehle chota amount bhejke check karunga.",
+                "Account mein balance check karna padega pehle. Direct number de do backup ke liye.",
+                "Transfer limit cross ho gayi hai aaj ki, kal subah karenge. Office address batao record ke liye.",
+                "Konse account mein bhejna hai? Bank details do aur tumhara employee ID bhi batao.",
+                "Bank app open kar raha hun, ek minute. Yeh payment kaunsi company ke liye hai? GST number hai kya?",
+                "Kitna amount? Balance dekhke batata hun. Email se invoice bhejo pehle.",
+                "Abhi bank ki app mein maintenance chal rahi hai, wait karo. Tumhara pura naam kya hai?",
             ]
-        return _pick_unique(stalls)
+        return _blend(_pick_unique(stalls), base_response)
 
     if any(
         kw in scammer_lower
         for kw in ["arrest", "police", "legal", "court", "case", "warrant", "jail", "fir"]
     ):
         fear_responses = [
-            "Sir please, mujhe bahut dar lag raha hai. Main kya karun?",
-            "Oh god, arrest? Meri family ko pata chalega kya?",
-            "Sir main innocent hun, please help me!",
-            "Kya jail hogi? Please sir, kuch karo!",
-            "Sir please, maine kuch galat nahi kiya! Believe karo!",
-            "Mujhe bahut tension ho rahi hai, batao kya karna hai!",
-            "Sir FIR? Meri naukri chali jaayegi!",
-            "Please sir, ghar walo ko mat batana. Main karunga jo bolo.",
+            "Sir please, mujhe bahut dar lag raha hai. Main kya karun? Aapka direct number do, disconnect ho gaya toh?",
+            "Oh god, arrest? Meri family ko pata chalega kya? Sir aapka naam aur badge number batao, main note karta hun.",
+            "Sir main innocent hun! Maine kuch galat nahi kiya. Aap kaunse police station se bol rahe hain? Address batao.",
+            "Kya jail hogi? Please sir kuch karo! Case number kya hai mera? Main apne lawyer ko dikhaunga.",
+            "Sir please, mujhe bahut tension ho rahi hai. Court ka order hai toh court ka naam aur address batao na.",
+            "Sir FIR? Meri naukri chali jaayegi! Aapka senior officer ka number do, main unse baat karunga.",
+            "Please sir, ghar walo ko mat batana. Main karunga jo bolo. Waise yeh case kab register hua? Date batao.",
+            "Mujhe bahut darr lag raha hai sir. Aap mujhe official letter email pe bhej sakte hain? Mera email hai...",
         ]
-        return _pick_unique(fear_responses)
+        return _blend(_pick_unique(fear_responses), base_response)
 
     return base_response

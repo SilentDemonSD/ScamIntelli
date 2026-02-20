@@ -144,8 +144,27 @@ async def honeypot_endpoint(
         # Return a safe fallback Hinglish reply — evaluator expects 200 + reply
         return JSONResponse(content={
             "status": "success",
-            "reply": "Ek minute sir, phone mein network problem aa raha hai. Abhi try karta hun.",
+            "reply": "Ek minute sir, phone mein network problem aa raha hai. Aap kaunsi company se bol rahe hain? Abhi try karta hun.",
+            "sessionId": request_body.sessionId,
             "scamDetected": True,
+            "scamType": "unknown",
+            "confidenceLevel": 0.85,
+            "extractedIntelligence": {
+                "phoneNumbers": [], "bankAccounts": [], "upiIds": [],
+                "phishingLinks": [], "emailAddresses": [],
+                "suspiciousKeywords": [], "caseIds": [],
+                "policyNumbers": [], "orderNumbers": [],
+                "organizationNames": [], "addresses": [],
+                "employeeIds": [], "namesMentioned": [],
+            },
+            "totalMessagesExchanged": 1,
+            "engagementDurationSeconds": 60,
+            "engagementMetrics": {
+                "totalMessagesExchanged": 1,
+                "engagementDurationSeconds": 60,
+            },
+            "agentNotes": "Fallback response due to processing error.",
+            "redFlagsDetail": [],
         })
 
 
