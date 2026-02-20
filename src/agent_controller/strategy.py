@@ -534,24 +534,25 @@ async def _process_message_inner(
         )
         session.persona_style = _map_persona_to_style(persona_type)
 
-    # --- Red Flag Detection (runs unconditionally to catch pre-detection flags) ---
-    detected_flags = RedFlagDetector.detect_red_flags(
-        message, session.turn_count, session.messages
-    )
-    for flag in detected_flags:
-        session.red_flags_detected.append(flag.to_dict())
-        logger.info(
-            "Session %s: Red flag %s detected (confidence %.2f)",
-            session.session_id, flag.flag_type.value, flag.confidence,
+    # --- Red Flag Detection (runs every turn where scam context exists) ---
+    if is_scam or session.scam_detected:
+        detected_flags = RedFlagDetector.detect_red_flags(
+            message, session.turn_count, session.messages
         )
+        for flag in detected_flags:
+            session.red_flags_detected.append(flag.to_dict())
+            logger.info(
+                "Session %s: Red flag %s detected (confidence %.2f)",
+                session.session_id, flag.flag_type.value, flag.confidence,
+            )
 
-    escalation = RedFlagDetector.analyze_behavioral_escalation(session.messages)
-    if escalation["escalation_detected"]:
-        logger.warning(
-            "Session %s: Escalation detected – speed: %s, pressure increasing: %s",
-            session.session_id, escalation["escalation_speed"],
-            escalation["pressure_increasing"],
-        )
+        escalation = RedFlagDetector.analyze_behavioral_escalation(session.messages)
+        if escalation["escalation_detected"]:
+            logger.warning(
+                "Session %s: Escalation detected – speed: %s, pressure increasing: %s",
+                session.session_id, escalation["escalation_speed"],
+                escalation["pressure_increasing"],
+            )
 
     session.extracted_intel = await extract_all_intelligence(
         message, session.extracted_intel
@@ -693,17 +694,8 @@ async def _process_message_inner(
             scam_cat_q, session.turn_count, session.extracted_intel,
         )
 
-        # H-2 FIX: Use extraction_strategy to prioritize questions targeting
-        # the primary missing intelligence type for this turn.
         if questions and session.turn_count >= 1:
-            selected_question = questions[0]  # default: highest priority
-            primary_target = (extraction_strategy or {}).get("primary_target")
-            if primary_target:
-                # Prefer a question that targets the planner's primary target
-                for q in questions:
-                    if primary_target in q.target_intelligence:
-                        selected_question = q
-                        break
+            selected_question = questions[0]  # highest priority
             reply_text = f"{reply_text} {selected_question.question_text}"
             logger.info(
                 "Session %s turn %d: Asking %s question targeting %s",

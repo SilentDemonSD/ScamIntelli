@@ -575,6 +575,5 @@ class RedFlagProber:
         if total_red_flags_session >= 5 and turn_number >= 5:
             return True  # Pattern of red flags — challenge them
 
-        # Probe ~65% of the time when red flags present — higher rate
-        # maximizes relevant-questions and red-flag-identification scoring.
-        return random.random() < 0.65
+        # Probe ~35% of the time when red flags present
+        return random.random() < 0.35

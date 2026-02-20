@@ -887,12 +887,7 @@ class ResponseSelfCorrector:
     def _truncate_response(cls, response: str) -> str:
         sentences = re.split(r"(?<=[.!?])\s+", response)
         if len(sentences) > 5:
-            # M-1 FIX: Preserve trailing question — if last sentence has ?,
-            # keep it alongside the first 3 sentences.
-            truncated = sentences[:4]
-            if "?" in sentences[-1] and "?" not in " ".join(truncated):
-                truncated[-1] = sentences[-1]
-            return " ".join(truncated)
+            return " ".join(sentences[:4])
         if len(response) > 400:
             return response[:350].rsplit(" ", 1)[0] + "..."
         return response
@@ -1194,8 +1189,8 @@ async def adapt_response_to_context(
         """Combine a contextual reaction with the AI base response.
         If the base already addresses the topic, just return base.
         Otherwise prepend the contextual line."""
-        # If base is already >180 chars and addresses the topic, keep base
-        if len(base) > 180:
+        # If base is already >100 chars and addresses the topic, keep base
+        if len(base) > 100:
             return base
         # Blend: contextual reaction + base continuation
         return f"{contextual} {base}" if base and base.lower() != contextual.lower() else contextual

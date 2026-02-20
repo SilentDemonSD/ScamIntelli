@@ -1094,28 +1094,6 @@ class QuestionBank:
 
     # General questions applicable to ALL scam types
     GENERAL_INVESTIGATIVE_QUESTIONS: List[InvestigativeQuestion] = [
-        # First-turn questions — essential for scoring from the very first reply
-        InvestigativeQuestion(
-            question_text="Aap kaun bol rahe hain? Aapka naam kya hai?",
-            question_type=QuestionType.IDENTITY_VERIFICATION,
-            target_intelligence=["names_mentioned"],
-            priority=10,
-            turn_range=(1, 3),
-        ),
-        InvestigativeQuestion(
-            question_text="Sir aap kaunsi company se bol rahe hain?",
-            question_type=QuestionType.ORGANIZATION_DETAILS,
-            target_intelligence=["organization_names"],
-            priority=9,
-            turn_range=(1, 4),
-        ),
-        InvestigativeQuestion(
-            question_text="Aapka phone number kya hai? Main note kar leta hun.",
-            question_type=QuestionType.CONTACT_VERIFICATION,
-            target_intelligence=["phone_numbers"],
-            priority=9,
-            turn_range=(1, 4),
-        ),
         InvestigativeQuestion(
             question_text="Sir, aapka contact number kya hai? Agar call disconnect ho jaye toh main wapas call karunga.",
             question_type=QuestionType.CONTACT_VERIFICATION,

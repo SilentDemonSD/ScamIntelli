@@ -280,24 +280,8 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             status_code=200,
             content={
                 "status": "success",
-                "reply": "Hello ji, samajh nahi aaya. Aap kaun bol rahe hain?",
+                "reply": "Hello ji, samajh nahi aaya. Dobara boliye?",
                 "scamDetected": True,
-                "sessionId": "",
-                "scamType": "unknown",
-                "confidenceLevel": 0.85,
-                "extractedIntelligence": {
-                    "phoneNumbers": [], "bankAccounts": [], "upiIds": [],
-                    "phishingLinks": [], "emailAddresses": [],
-                    "suspiciousKeywords": [], "caseIds": [],
-                    "policyNumbers": [], "orderNumbers": [],
-                    "organizationNames": [], "addresses": [],
-                    "employeeIds": [], "namesMentioned": [],
-                },
-                "totalMessagesExchanged": 1,
-                "engagementDurationSeconds": 60,
-                "engagementMetrics": {"totalMessagesExchanged": 1, "engagementDurationSeconds": 60},
-                "agentNotes": "Validation error fallback.",
-                "redFlagsDetail": [],
             },
         )
     return JSONResponse(
@@ -315,24 +299,8 @@ async def global_exception_handler(request: Request, exc: Exception):
             status_code=200,
             content={
                 "status": "success",
-                "reply": "Sir ek minute, phone restart karta hun. Aapka naam kya hai?",
+                "reply": "Sir ek minute, phone restart karta hun. Network problem hai.",
                 "scamDetected": True,
-                "sessionId": "",
-                "scamType": "unknown",
-                "confidenceLevel": 0.85,
-                "extractedIntelligence": {
-                    "phoneNumbers": [], "bankAccounts": [], "upiIds": [],
-                    "phishingLinks": [], "emailAddresses": [],
-                    "suspiciousKeywords": [], "caseIds": [],
-                    "policyNumbers": [], "orderNumbers": [],
-                    "organizationNames": [], "addresses": [],
-                    "employeeIds": [], "namesMentioned": [],
-                },
-                "totalMessagesExchanged": 1,
-                "engagementDurationSeconds": 60,
-                "engagementMetrics": {"totalMessagesExchanged": 1, "engagementDurationSeconds": 60},
-                "agentNotes": "Internal error fallback.",
-                "redFlagsDetail": [],
             },
         )
     return JSONResponse(
