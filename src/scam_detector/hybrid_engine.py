@@ -1,3 +1,20 @@
+"""
+Module: src.scam_detector.hybrid_engine
+
+Purpose:
+    Hybrid 11-layer scam detection engine combining keyword analysis, ML models,
+    behavioral patterns, URL analysis, and multilingual detection. Produces a
+    unified scam score from multiple independent detection layers.
+
+Key Components:
+    - HybridDetectionResult: Dataclass holding multi-layer detection results and final score
+    - HybridScamDetectionEngine: Main engine orchestrating all 11 detection layers
+
+Author: ScamIntelli Team
+Last Modified: 2025-02-20
+Version: 2.0
+"""
+
 import asyncio
 import re
 from dataclasses import dataclass

@@ -1,14 +1,46 @@
+"""
+Module: src.agent_controller.strategy
+
+Purpose:
+    Core message processing pipeline for the ScamIntelli honeypot agent.
+    Handles scam detection, red flag tracking, intelligence extraction,
+    persona-driven response generation, and investigative question injection.
+
+Key Components:
+    - ConversationContextTracker: Tracks conversation context across turns for coherent engagement
+    - EngagementStrategy: Determines engagement tactics based on scam score and session state
+    - process_message: Main async entry point for processing incoming scammer messages
+    - _get_intel_extraction_question: Injects investigative questions to extract intelligence
+
+Author: ScamIntelli Team
+Last Modified: 2025-02-20
+Version: 2.0
+"""
+
 import asyncio
+import logging
 import random
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Tuple
 
 from src.config import get_settings
+from src.agent_controller.question_engine import (
+    IntelligenceExtractionPlanner,
+    QuestionBank,
+)
+from src.agent_controller.red_flag_tracker import (
+    RedFlagDetector,
+    RedFlagInstance,
+    RedFlagProber,
+    RedFlagType,
+)
 from src.intelligence_extractor.extractor import (
     extract_all_intelligence,
     has_sufficient_intelligence,
     make_context_aware_probe,
 )
+
+logger = logging.getLogger(__name__)
 from src.models import AgentReply, ExtractedIntelligence, PersonaStyle, SessionState
 from src.persona_engine.age_adaptive import AgeAdaptivePersonaEngine
 from src.persona_engine.emotional_intelligence import (
@@ -426,6 +458,26 @@ async def _process_message_inner(
         )
         session.persona_style = _map_persona_to_style(persona_type)
 
+    # --- Red Flag Detection (runs every turn where scam context exists) ---
+    if is_scam or session.scam_detected:
+        detected_flags = RedFlagDetector.detect_red_flags(
+            message, session.turn_count, session.messages
+        )
+        for flag in detected_flags:
+            session.red_flags_detected.append(flag.to_dict())
+            logger.info(
+                "Session %s: Red flag %s detected (confidence %.2f)",
+                session.session_id, flag.flag_type.value, flag.confidence,
+            )
+
+        escalation = RedFlagDetector.analyze_behavioral_escalation(session.messages)
+        if escalation["escalation_detected"]:
+            logger.warning(
+                "Session %s: Escalation detected – speed: %s, pressure increasing: %s",
+                session.session_id, escalation["escalation_speed"],
+                escalation["pressure_increasing"],
+            )
+
     session.extracted_intel = await extract_all_intelligence(
         message, session.extracted_intel
     )
@@ -534,20 +586,69 @@ async def _process_message_inner(
     _conf = hybrid_result.confidence if hybrid_result else 0.0
 
     if session.scam_detected and session.engagement_active:
-        # Use context-aware probe when confidence is high enough
-        probe = make_context_aware_probe(
-            session.messages,
-            session.extracted_intel,
-            confidence=_conf,
+        # --- Question Engine: strategic investigative questions ---
+        scam_cat_q = _ensure_scam_category(session.scam_category)
+        extraction_strategy = IntelligenceExtractionPlanner.get_extraction_strategy(
+            scam_cat_q, session.turn_count, session.extracted_intel,
         )
-        if probe and _conf >= 0.5:
-            reply_text = f"{reply_text} {probe}"
-        else:
-            intel_question = _get_intel_extraction_question(
-                session.turn_count, session.extracted_intel
+
+        questions = QuestionBank.get_questions_for_category(
+            scam_cat_q, session.turn_count, session.extracted_intel,
+        )
+
+        if questions and session.turn_count >= 2:
+            selected_question = questions[0]  # highest priority
+            reply_text = f"{reply_text} {selected_question.question_text}"
+            logger.info(
+                "Session %s turn %d: Asking %s question targeting %s",
+                session.session_id, session.turn_count,
+                selected_question.question_type.value,
+                selected_question.target_intelligence,
             )
-            if intel_question:
-                reply_text = f"{reply_text} {intel_question}"
+
+        # Probing follow-ups when scammer just shared something valuable
+        if session.turn_count >= 3 and len(session.messages) >= 2:
+            last_msg = session.messages[-2]
+            if last_msg.get("role") in ("user", "scammer"):
+                if session.extracted_intel.phone_numbers:
+                    followup = QuestionBank.get_probing_followup(
+                        "phone_mentioned",
+                        session.extracted_intel.phone_numbers[-1],
+                        session.messages,
+                    )
+                    if followup and len(reply_text.split()) < 40:
+                        reply_text = f"{reply_text} {followup}"
+
+        # --- Red Flag Probing ---
+        if session.red_flags_detected and session.turn_count >= 3:
+            recent_flag_dicts = session.red_flags_detected[-3:]
+            recent_flags = [
+                RedFlagInstance(
+                    flag_type=RedFlagType(f["flag_type"]),
+                    turn_number=f["turn"],
+                    message_content=f["content_snippet"],
+                    confidence=f["confidence"],
+                )
+                for f in recent_flag_dicts
+            ]
+            already_asked = [
+                m.get("content", "")
+                for m in session.messages
+                if m.get("role") == "agent"
+            ]
+            should_probe = RedFlagProber.should_probe_now(
+                recent_flags, session.turn_count, len(session.red_flags_detected),
+            )
+            if should_probe:
+                probing_q = RedFlagProber.generate_probing_question(
+                    recent_flags, session.turn_count, already_asked,
+                )
+                if probing_q:
+                    reply_text = f"{reply_text} {probing_q}"
+                    logger.info(
+                        "Session %s turn %d: Adding red flag probing question",
+                        session.session_id, session.turn_count,
+                    )
 
     session = await _update_state(session, reply_text, "agent")
 
@@ -585,6 +686,14 @@ async def _process_message_inner(
 
 
 def _map_persona_to_style(persona_type) -> PersonaStyle:
+    """Map a PersonaType to a higher-level PersonaStyle for response generation.
+
+    Args:
+        persona_type: PersonaType enum or string representation.
+
+    Returns:
+        PersonaStyle.ANXIOUS, COOPERATIVE, or CONFUSED depending on persona.
+    """
     persona_type = _ensure_persona_type(persona_type)
     anxious_personas = {
         PersonaType.ELDERLY_ANXIOUS,
@@ -607,6 +716,18 @@ def _map_persona_to_style(persona_type) -> PersonaStyle:
 
 
 def _deduplicate_response(reply: str, messages: list) -> str:
+    """Prevent repetitive agent responses by checking overlap with recent messages.
+
+    If the proposed reply is identical or >80% word-overlap with a recent agent
+    message, substitutes a varied stalling response instead.
+
+    Args:
+        reply: Proposed agent response text.
+        messages: Full conversation message list.
+
+    Returns:
+        Original reply if unique, or a varied fallback response.
+    """
     recent_agent_msgs = [
         m.get("content", "").strip().lower()
         for m in messages[-10:]
@@ -635,6 +756,15 @@ def _deduplicate_response(reply: str, messages: list) -> str:
 
 
 def _get_varied_response(original: str, messages: list) -> str:
+    """Generate a varied stalling response when the original would be repetitive.
+
+    Args:
+        original: The duplicate response to replace.
+        messages: Conversation messages (used to avoid re-using stalls).
+
+    Returns:
+        A randomly selected, previously-unused stalling response.
+    """
     varied_stalls = [
         "Ek minute sir, phone mein kuch dikkat aa rahi hai.",
         "Haan ji, main dekh raha hun, thoda time lagega.",
@@ -737,6 +867,18 @@ def _describe_missing_intel(intel: ExtractedIntelligence) -> str:
 
 
 def _generate_dynamic_non_scam_response(message: str, session: SessionState) -> str:
+    """Generate a natural response when no scam has been detected yet.
+
+    Handles greetings, identity queries, and generic early/late turn replies
+    to keep the conversation going until scam detection triggers.
+
+    Args:
+        message: Incoming message text.
+        session: Current SessionState.
+
+    Returns:
+        Contextually appropriate non-scam response string.
+    """
     msg_lower = message.lower()
     turn = session.turn_count
 
@@ -800,7 +942,16 @@ def _generate_dynamic_non_scam_response(message: str, session: SessionState) -> 
 
 
 async def _update_state(session: SessionState, message: str, role: str) -> SessionState:
+    """Append a message to session history and update turn count.
 
+    Args:
+        session: Current SessionState to update.
+        message: Message content to append.
+        role: Message role ('scammer', 'agent', etc.).
+
+    Returns:
+        Updated SessionState with new message and incremented turn count.
+    """
     session.messages.append(
         {
             "role": role,
@@ -817,6 +968,17 @@ async def _update_state(session: SessionState, message: str, role: str) -> Sessi
 
 
 async def should_trigger_callback(session: SessionState) -> bool:
+    """Determine if the GUVI callback should be dispatched for this session.
+
+    Returns True when scam was detected, engagement has ended, and sufficient
+    intelligence was collected (or enough turns elapsed).
+
+    Args:
+        session: Current SessionState.
+
+    Returns:
+        True if callback should be triggered.
+    """
     if not session.scam_detected:
         return False
 
@@ -828,6 +990,17 @@ async def should_trigger_callback(session: SessionState) -> bool:
 
 
 async def get_engagement_summary(session: SessionState) -> dict:
+    """Build a comprehensive summary of the honeypot engagement session.
+
+    Includes scam category, persona used, age group, intelligence counts,
+    and human-readable agent notes.
+
+    Args:
+        session: Completed or in-progress SessionState.
+
+    Returns:
+        Dict with session_id, scam info, intelligence counts, and notes.
+    """
     from src.agent_controller.agent_state import generate_agent_notes
 
     notes = await generate_agent_notes(session)

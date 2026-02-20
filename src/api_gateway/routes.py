@@ -1,3 +1,22 @@
+"""
+Module: src.api_gateway.routes
+
+Purpose:
+    FastAPI routes for the ScamIntelli honeypot API. Provides /honeypot,
+    /message, /session, /health endpoints with scam detection, intelligence
+    extraction, and conversation metrics.
+
+Key Components:
+    - honeypot_endpoint: Main endpoint for receiving and responding to scammer messages
+    - handle_message: Core message processing handler with session management
+    - get_session: Retrieves session state and conversation history
+    - health_check: Service health and readiness endpoints
+
+Author: ScamIntelli Team
+Last Modified: 2025-02-20
+Version: 2.0
+"""
+
 import asyncio
 import json
 from datetime import datetime, timezone
@@ -179,6 +198,28 @@ async def honeypot_endpoint(
     )
     scam_detected = session.scam_detected or bool(has_intel)
 
+    # Red flags detail for response
+    red_flags_detail = []
+    for rf in getattr(session, "red_flags_detected", []):
+        red_flags_detail.append({
+            "type": rf.get("flag_type", "unknown"),
+            "turn": rf.get("turn", 0),
+            "confidence": rf.get("confidence", 0.0),
+            "snippet": rf.get("content_snippet", ""),
+        })
+
+    # Build metrics block (also keep backward-compatible "engagementMetrics" key)
+    metrics_block = {
+        "totalMessagesExchanged": len(
+            [m for m in session.messages if m.get("role") in ("scammer", "agent")]
+        ),
+        "engagementDurationSeconds": duration_seconds,
+        "turnCount": session.turn_count,
+        "personaUsed": getattr(session, "persona_type", None),
+        "scamCategory": session.scam_category,
+        "confidenceScore": getattr(session, "confidence_level", 0.0),
+    }
+
     return JSONResponse(content={
         "status": "success",
         "reply": reply.reply,
@@ -190,13 +231,17 @@ async def honeypot_endpoint(
             "upiIds": intel.upi_ids,
             "phishingLinks": intel.phishing_links,
             "emailAddresses": intel.email_addresses,
+            "caseIds": getattr(intel, "case_ids", []),
+            "policyNumbers": getattr(intel, "policy_numbers", []),
+            "orderNumbers": getattr(intel, "order_numbers", []),
+            "organizationNames": getattr(intel, "organization_names", []),
+            "employeeIds": getattr(intel, "employee_ids", []),
+            "namesMentioned": getattr(intel, "names_mentioned", []),
+            "addresses": getattr(intel, "addresses", []),
         },
-        "engagementMetrics": {
-            "totalMessagesExchanged": len(
-                [m for m in session.messages if m.get("role") in ("scammer", "agent")]
-            ),
-            "engagementDurationSeconds": duration_seconds,
-        },
+        "engagementMetrics": metrics_block,
+        "conversationMetrics": metrics_block,
+        "redFlagsDetail": red_flags_detail,
         "agentNotes": agent_notes,
     })
 

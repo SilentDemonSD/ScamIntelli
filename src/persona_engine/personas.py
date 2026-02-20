@@ -1,3 +1,22 @@
+"""
+Module: src.persona_engine.personas
+
+Purpose:
+    Persona generation and response engine using Google Gemini AI. Supports
+    12+ persona types for engaging scammers with culturally-authentic Hinglish
+    responses tailored to different scam categories.
+
+Key Components:
+    - PersonaType: Enum defining 12+ distinct persona archetypes
+    - PersonaProfile: Dataclass holding persona traits, background, and response style
+    - generate_persona_response: Generates AI-driven in-character replies to scammers
+    - ResponseSelfCorrector: Validates and corrects responses for persona consistency
+
+Author: ScamIntelli Team
+Last Modified: 2025-02-20
+Version: 2.0
+"""
+
 import asyncio
 import random
 import re
