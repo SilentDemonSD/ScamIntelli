@@ -176,13 +176,6 @@ async def _honeypot_endpoint_inner(
 
     session = await get_or_create_session(request_body.sessionId)
 
-    # In honeypot mode, the evaluator ONLY sends scam messages.
-    # Pre-set scam_detected BEFORE processing so the full scam-handling
-    # pipeline activates from turn 1 (persona, questions, red flags, intel).
-    # The detection engine still runs authentically inside process_message;
-    # this just ensures the session state is correct from the start.
-    session.scam_detected = True
-
     if request_body.conversationHistory:
         session = await _extract_intel_from_history(
             request_body.conversationHistory, session
@@ -211,7 +204,9 @@ async def _honeypot_endpoint_inner(
     intel = session.extracted_intel
     scam_type = _map_scam_type(session.scam_category, intel)
 
-    scam_detected = True  # Always true in honeypot mode
+    # Use the authentic detection result from the processing pipeline.
+    # The hybrid engine + classifier determine scam_detected — no hardcoding.
+    scam_detected = session.scam_detected
 
     # Red flags detail for response
     red_flags_detail = []

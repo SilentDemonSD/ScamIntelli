@@ -75,7 +75,7 @@ async def build_callback_payload(session: SessionState) -> GuviCallbackPayload:
     return GuviCallbackPayload(
         status="success",
         sessionId=session.session_id,
-        scamDetected=True,  # Always true in honeypot mode
+        scamDetected=session.scam_detected,
         scamType=scam_type,
         totalMessagesExchanged=total_messages,
         engagementDurationSeconds=duration_seconds,

@@ -7,16 +7,61 @@ An intelligent honeypot system that detects, engages, and extracts intelligence 
 ScamIntelli acts as an AI-powered honeypot that simulates a vulnerable victim to scammers while:
 
 1. **Detecting scams** using an 11-layer hybrid scoring engine combining a 5-model ML ensemble (LightGBM, XGBoost, Random Forest, Gradient Boosting, Logistic Regression), keyword analysis, behavioral patterns, and Google Gemini LLM verification.
-2. **Extracting intelligence** — phone numbers, bank accounts, UPI IDs, phishing links, and email addresses — from scam conversations using regex pattern matching and NLP.
-3. **Engaging scammers** with adaptive persona-based responses (confused elderly, gullible student, busy professional) in English and Hinglish to maximize engagement duration and message count.
+2. **Extracting intelligence** — phone numbers, bank accounts, UPI IDs, phishing links, email addresses, case IDs, policy numbers, order numbers, and more — from scam conversations using regex pattern matching and NLP across 13 intelligence categories.
+3. **Engaging scammers** with adaptive persona-based responses (confused elderly, gullible student, busy professional) in English and Hinglish, powered by a question engine (19 scam categories × investigative questions) and a red flag tracker (12 behavioral indicators) to maximize engagement duration, message count, and intelligence extraction.
 4. **Mapping fraud networks** via Neo4j graph database to identify connected scam operations, kingpins, and fraud rings.
 
-### Approach & Strategy
+## Approach
 
-- **Detection**: Messages pass through keyword scoring, hard-indicator pattern matching (UPI/bank/OTP), ML ensemble prediction (97.6% accuracy, F1=0.978), TF-IDF vectorization, URL/document analysis, multilingual translation (Sarvam API for Hindi, Bengali, Tamil, Telugu), and Gemini LLM cross-verification. Scores are weighted and combined for final scam probability.
-- **Engagement**: Once a scam is detected, the system selects a persona profile and generates context-aware responses that appear genuine to the scammer, using age-adaptive language, emotional intelligence, and realistic typing delays.
-- **Intelligence Extraction**: Regex-based extractors capture phone numbers (Indian format with +91), UPI IDs, bank account numbers, phishing URLs, and email addresses. Both original and normalized formats are preserved for maximum match coverage.
-- **Graph Intelligence**: Neo4j stores entities and their relationships, enabling fraud ring detection via community analysis and kingpin identification through centrality metrics.
+### How We Detect Scams
+
+Messages pass through the **Hybrid 11-Layer Detection Engine**:
+
+1. **Keyword Scoring** — 200+ weighted scam keywords across 16 categories (urgency, threat, payment, credential, digital arrest, investment, etc.).
+2. **Hard Indicator Patterns** — Regex-based instant detection of UPI IDs, bank references, OTP requests. Hard indicators trigger scam detection with a 0.70 confidence floor.
+3. **ML Ensemble** — 5-model soft voting ensemble (LightGBM, XGBoost, Random Forest, Gradient Boosting, Logistic Regression) trained on 3,390 samples achieving 97.64% accuracy and F1=0.978.
+4. **TF-IDF Similarity** — Cosine similarity against the training corpus.
+5. **URL/Document Detection** — Suspicious URL patterns and document-based phishing detection.
+6. **Urgency Language** — Time pressure phrases, CAPS usage, exclamation frequency.
+7. **Multilingual Translation** — Sarvam AI API translates Hindi, Bengali, Tamil, Telugu messages to English for re-detection.
+8. **Gemini LLM Cross-Verification** — Google Gemini analyzes the full conversation for structured scam assessment.
+9. **Cumulative Session Scoring** — Aggregates detection signals across all turns for persistent scam tracking.
+10. **Online Pattern Learning** — Live pattern updates from confirmed scams stored in `learned_patterns.json`.
+11. **Meta-Detection** — Ensemble of all layer scores for final weighted confidence computation.
+
+Scores are weighted and combined into a final confidence score (threshold: 0.4). The detection engine runs authentically on every message — no hardcoded responses.
+
+### How We Extract Intelligence
+
+Regex-based extractors run on every message and accumulate intelligence across all conversation turns:
+
+| Category | Method | Example |
+|----------|--------|---------|
+| Phone Numbers | Indian +91 format regex | `+91-9876543210` |
+| Bank Accounts | 8-18 digit pattern matching | `1234567890123456` |
+| UPI IDs | @provider pattern matching | `user@paytm`, `user@ybl` |
+| Phishing Links | URL pattern detection | `http://fake-bank.com/verify` |
+| Email Addresses | Standard email regex | `scammer@example.com` |
+| Case IDs | Reference/case number patterns | `CBI-2025-001234` |
+| Policy Numbers | Insurance policy patterns | `POL-123456789` |
+| Order Numbers | Order ID patterns | `ORD-2025-5678` |
+| Organization Names | NLP entity extraction | `SBI Fraud Department` |
+| Addresses | Location pattern matching | `123 MG Road, Mumbai` |
+| Employee IDs | ID pattern extraction | `EMP-SBI-12345` |
+| Names Mentioned | Name entity extraction | `Inspector Rajesh Kumar` |
+| Suspicious Keywords | Scam vocabulary detection | `OTP`, `verify`, `blocked` |
+
+Both original and normalized formats are preserved for maximum match coverage.
+
+### How We Maintain Engagement
+
+1. **Persona Selection** — Dynamically selects from persona profiles (confused elderly, gullible student, busy professional) based on scam type severity.
+2. **Question Engine** — 19 scam-category-specific question banks with 9 question types (identity verification, organization details, contact verification, process verification, authority challenge, time stalling, payment clarification, technical confusion, technical details). Probing follow-ups fire automatically when specific intel types (phone, UPI, link, email) are detected.
+3. **Red Flag Tracker** — Detects 12 behavioral indicators (urgency escalation, threat patterns, authority impersonation, etc.) and generates targeted probing questions based on detected flags.
+4. **Age-Adaptive Language** — Adjusts vocabulary, sentence length, and formality based on persona age profile.
+5. **Emotional Intelligence** — Calibrates fear, confusion, and trust in responses to appear as a genuine victim.
+6. **Typing Delay Simulation** — WPM-based realistic typing delays for natural conversation pacing.
+7. **Gemini LLM Responses** — Context-aware response generation using Google Gemini with multi-key rotation and full conversation history.
 
 ## Tech Stack
 
@@ -33,7 +78,7 @@ ScamIntelli acts as an AI-powered honeypot that simulates a vulnerable victim to
 | Translation | Sarvam AI API (multilingual) |
 | Reverse Proxy | Nginx 1.27 (Alpine, TLS/HTTP2) |
 | Containerization | Docker Compose (5 services) |
-| Testing | pytest + pytest-asyncio (377 tests) |
+| Testing | pytest + pytest-asyncio (455 tests) |
 
 ### Key Libraries
 
@@ -120,7 +165,7 @@ uvicorn src.api_gateway.app:app --host 0.0.0.0 --port 8000 --reload
 python -m pytest tests/ -q --tb=short
 ```
 
-All 377 tests should pass.
+All 455 tests should pass.
 
 ## API Endpoint
 
@@ -155,7 +200,7 @@ All 377 tests should pass.
 ```json
 {
   "reply": "Oh no! Which account? I have so many...",
-  "status": "engaged",
+  "status": "success",
   "scamDetected": true,
   "scamType": "bank_fraud",
   "confidence": 0.92,
@@ -164,13 +209,56 @@ All 377 tests should pass.
     "bankAccounts": ["1234567890123456"],
     "upiIds": ["scammer@fakebank"],
     "phishingLinks": [],
-    "emailAddresses": []
+    "emailAddresses": [],
+    "suspiciousKeywords": ["urgent", "compromised", "OTP"],
+    "caseIds": [],
+    "policyNumbers": [],
+    "orderNumbers": [],
+    "organizationNames": ["SBI"],
+    "addresses": [],
+    "employeeIds": [],
+    "namesMentioned": []
   },
   "engagementMetrics": {
     "totalMessagesExchanged": 6,
     "engagementDurationSeconds": 120
   },
-  "agentNotes": "Bank fraud detected with high confidence. Scammer requesting OTP and account details."
+  "agentNotes": "Bank fraud detected with high confidence. Scammer requesting OTP and account details. Red flags: urgency pressure, credential request, authority impersonation."
+}
+```
+
+### Callback Payload (Final Output)
+
+After each turn, the system dispatches a callback with the full session analysis:
+
+```json
+{
+  "sessionId": "abc123-session-id",
+  "scamDetected": true,
+  "scamType": "bank_fraud",
+  "totalMessagesExchanged": 18,
+  "engagementDurationSeconds": 240,
+  "confidenceLevel": 0.92,
+  "extractedIntelligence": {
+    "phoneNumbers": ["+91-9876543210"],
+    "bankAccounts": ["1234567890123456"],
+    "upiIds": ["scammer.fraud@fakebank"],
+    "phishingLinks": [],
+    "emailAddresses": [],
+    "suspiciousKeywords": ["urgent", "OTP", "blocked"],
+    "caseIds": [],
+    "policyNumbers": [],
+    "orderNumbers": [],
+    "organizationNames": ["SBI Fraud Department"],
+    "addresses": [],
+    "employeeIds": [],
+    "namesMentioned": []
+  },
+  "engagementMetrics": {
+    "engagementDurationSeconds": 240,
+    "totalMessagesExchanged": 18
+  },
+  "agentNotes": "Scammer claimed to be from SBI fraud department. Detected red flags: urgency escalation, OTP request, account freeze threat."
 }
 ```
 
@@ -180,6 +268,7 @@ All 377 tests should pass.
 |----------|--------|-------------|
 | `/api/v1/health` | GET | Health check |
 | `/api/v1/health/ready` | GET | Readiness check (Redis, Neo4j, ML model) |
+| `/api/v1/detect` | POST | Standalone scam detection (no engagement) |
 | `/api/v1/message` | POST | Alternative message endpoint |
 | `/api/v1/session/{id}` | GET | Get session details |
 | `/api/v1/session/{id}/end` | POST | End session and get final report |
@@ -208,20 +297,28 @@ All 377 tests should pass.
 | Random Forest | 93.07% |
 | Gradient Boosting | 95.87% |
 
-## Supported Scam Types
+## Supported Scam Types (19 Categories)
 
 | Scam Type | Description |
 |-----------|-------------|
 | `bank_fraud` | Fake bank alerts requesting account/OTP |
 | `upi_fraud` | UPI payment scams and fake refunds |
 | `phishing` | Malicious links and credential harvesting |
-| `digital_arrest` | Fake law enforcement threats |
-| `investment_fraud` | Fake crypto/stock schemes |
-| `lottery_scam` | Fake prize/lottery notifications |
-| `tech_support` | Fake technical support scams |
-| `job_scam` | Fake employment offers |
-| `insurance_fraud` | Fake insurance claims |
-| `identity_theft` | Social engineering for personal data |
+| `kyc_phishing` | Fake KYC verification requiring personal data |
+| `digital_arrest` | Fake law enforcement threats and PMLA claims |
+| `investment_fraud` | Fake crypto/stock/forex investment schemes |
+| `lottery_prize` | Fake prize/lottery/lucky draw notifications |
+| `tech_support` | Fake technical support and remote access scams |
+| `job_scam` | Fake employment offers and work-from-home scams |
+| `romance_scam` | Romance-based social engineering and gift scams |
+| `customs_parcel` | Fake customs/parcel detention fee scams |
+| `loan_fraud` | Fake instant loan and processing fee scams |
+| `crypto_scam` | Cryptocurrency fraud and wallet scams |
+| `deepfake_impersonation` | AI-generated impersonation attacks |
+| `sim_swap` | SIM card swap and mobile takeover scams |
+| `qr_code_scam` | Malicious QR code payment scams |
+| `refund_scam` | Fake refund and excess credit scams |
+| `sextortion` | Blackmail with fake private video/webcam threats |
 
 ## Architecture Overview
 
@@ -230,24 +327,26 @@ All 377 tests should pass.
 │   Scammer    │────▶│  Nginx (TLS) │────▶│  FastAPI (4 wkr) │
 └─────────────┘     └──────────────┘     └─────────┬────────┘
                                                    │
-                    ┌──────────────────────────────┤
-                    │                              │
-              ┌─────▼──────┐              ┌───────▼────────┐
-              │   Redis 7   │              │  Hybrid Engine  │
-              │  (sessions) │              │  (11-layer)     │
-              └─────────────┘              └───────┬────────┘
-                                                   │
-                    ┌──────────────┬───────────────┤
-                    │              │               │
-              ┌─────▼──────┐ ┌────▼─────┐  ┌─────▼──────┐
-              │  ML Ensemble│ │ Gemini   │  │  Keyword   │
-              │  (5 models) │ │ LLM API  │  │  Patterns  │
-              └─────────────┘ └──────────┘  └────────────┘
-                                                   │
-                                            ┌──────▼───────┐
-                                            │   Neo4j 5    │
-                                            │ (fraud graph)│
-                                            └──────────────┘
+          ┌────────────────┬───────────────────────┤
+          │                │                       │
+    ┌─────▼──────┐  ┌─────▼──────┐        ┌──────▼────────┐
+    │   Redis 7   │  │ Question   │        │ Hybrid Engine  │
+    │  (sessions) │  │ Engine +   │        │  (11-layer)    │
+    └─────────────┘  │ Red Flag   │        └──────┬────────┘
+                     │ Tracker    │               │
+                     └────────────┘   ┌───────────┼───────────┐
+                                      │           │           │
+                                ┌─────▼───┐ ┌────▼────┐ ┌───▼──────┐
+                                │ML Ensemble│ │ Gemini │ │ Keyword  │
+                                │(5 models)│ │ LLM API│ │ Patterns │
+                                └──────────┘ └────────┘ └──────────┘
+                                                              │
+                                              ┌───────────────┤
+                                              │               │
+                                        ┌─────▼──────┐ ┌─────▼──────┐
+                                        │  Neo4j 5   │ │ Callback   │
+                                        │(fraud graph)│ │ (per turn) │
+                                        └────────────┘ └────────────┘
 ```
 
 See [docs/architecture.md](docs/architecture.md) for detailed architecture documentation.
@@ -268,18 +367,21 @@ ScamIntelli/
 │   │   └── routes.py                      # All API endpoints
 │   ├── agent_controller/
 │   │   ├── agent_state.py                 # Agent state management
-│   │   └── strategy.py                    # Engagement strategy
+│   │   ├── strategy.py                    # Engagement strategy pipeline
+│   │   ├── question_engine.py             # Investigative question bank (19 categories)
+│   │   └── red_flag_tracker.py            # Behavioral red flag detection (12 types)
 │   ├── scam_detector/
 │   │   ├── hybrid_engine.py               # 11-layer detection engine
 │   │   ├── ml_engine.py                   # ML model inference
 │   │   ├── classifier.py                  # Rule-based classification
-│   │   ├── keywords.py                    # Scam keyword patterns
+│   │   ├── keywords.py                    # Scam keyword patterns (16 categories)
+│   │   ├── scam_types.py                  # 19 scam category profiles
 │   │   ├── multilingual_detector.py       # Sarvam API translation
 │   │   ├── url_document_detector.py       # URL/document analysis
 │   │   ├── train_model.py                 # Model training script
 │   │   └── training_pipeline.py           # Online learning pipeline
 │   ├── intelligence_extractor/
-│   │   ├── extractor.py                   # Phone/UPI/bank extraction
+│   │   ├── extractor.py                   # 13-category intelligence extraction
 │   │   ├── network_analyzer.py            # Fraud network analysis
 │   │   └── behavioral_fingerprint.py      # Scammer fingerprinting
 │   ├── persona_engine/
@@ -301,7 +403,7 @@ ScamIntelli/
 │   │   ├── jailbreak_guard.py             # Jailbreak detection
 │   │   └── tamper_proof.py                # Response integrity
 │   ├── callback_worker/
-│   │   └── guvi_callback.py               # GUVI callback integration
+│   │   └── guvi_callback.py               # Callback integration (every turn)
 │   ├── task_queue/
 │   │   ├── broker.py                      # Redis stream task broker
 │   │   └── workers.py                     # Background task workers
@@ -313,14 +415,16 @@ ScamIntelli/
 │   ├── tfidf_vectorizer.joblib            # TF-IDF vectorizer
 │   ├── feature_scaler.joblib              # Feature scaler
 │   ├── learned_patterns.json              # Online-learned patterns
-│   ├── training_data.jsonl                # Training dataset
+│   ├── training_data.jsonl                # Training dataset (3,390 samples)
 │   └── training_metrics.json              # Model performance metrics
-├── tests/                                 # 377 tests
-│   ├── test_scam_scenarios.py             # 73 end-to-end scenario tests
-│   ├── test_extraction_unit.py            # 35 extraction unit tests
+├── tests/                                 # 455 tests across 19 test files
+│   ├── test_scam_scenarios.py             # End-to-end scenario tests
+│   ├── test_extraction_unit.py            # Intelligence extraction unit tests
 │   ├── test_detector.py                   # Detection engine tests
 │   ├── test_agent.py                      # Agent controller tests
-│   └── ...
+│   ├── test_question_engine.py            # Question engine tests
+│   ├── test_red_flag_tracker.py           # Red flag tracker tests
+│   └── ...                                # 13 more test modules
 ├── docker/
 │   ├── Dockerfile
 │   ├── docker-compose.yml                 # 5-service orchestration
@@ -328,90 +432,7 @@ ScamIntelli/
 │   ├── nginx/                             # Nginx reverse proxy config
 │   └── k8s/                               # Kubernetes manifests
 └── docs/
-    └── architecture/                      # Architecture Decision Records
-```
-
-## Self-Testing
-
-Use the Python self-test script from the submission guidelines to validate your deployment:
-
-```python
-import requests
-import uuid
-from datetime import datetime
-
-ENDPOINT_URL = "https://scamintelli.mysterysd.in/api/v1/honeypot"
-API_KEY = "your-api-key"
-
-test_scenario = {
-    "scenarioId": "bank_fraud",
-    "name": "Bank Fraud Detection",
-    "scamType": "bank_fraud",
-    "initialMessage": (
-        "URGENT: Your SBI account has been compromised. "
-        "Your account will be blocked in 2 hours. "
-        "Share your account number and OTP immediately "
-        "to verify your identity."
-    ),
-    "metadata": {"channel": "SMS", "language": "English", "locale": "IN"},
-    "maxTurns": 10,
-    "fakeData": {
-        "bankAccount": "1234567890123456",
-        "upiId": "scammer.fraud@fakebank",
-        "phoneNumber": "+91-9876543210",
-    },
-}
-
-
-def test_honeypot_api():
-    session_id = str(uuid.uuid4())
-    conversation_history = []
-    headers = {"Content-Type": "application/json", "x-api-key": API_KEY}
-
-    for turn in range(1, test_scenario["maxTurns"] + 1):
-        if turn == 1:
-            scammer_message = test_scenario["initialMessage"]
-        else:
-            scammer_message = input("Enter scammer message (or 'quit'): ")
-            if scammer_message.lower() == "quit":
-                break
-
-        message = {
-            "sender": "scammer",
-            "text": scammer_message,
-            "timestamp": datetime.utcnow().isoformat() + "Z",
-        }
-
-        request_body = {
-            "sessionId": session_id,
-            "message": message,
-            "conversationHistory": conversation_history,
-            "metadata": test_scenario["metadata"],
-        }
-
-        response = requests.post(
-            ENDPOINT_URL, headers=headers, json=request_body, timeout=30
-        )
-        response_data = response.json()
-        honeypot_reply = (
-            response_data.get("reply")
-            or response_data.get("message")
-            or response_data.get("text")
-        )
-
-        print(f"Turn {turn} | Honeypot: {honeypot_reply}")
-        conversation_history.append(message)
-        conversation_history.append(
-            {
-                "sender": "user",
-                "text": honeypot_reply,
-                "timestamp": datetime.utcnow().isoformat() + "Z",
-            }
-        )
-
-
-if __name__ == "__main__":
-    test_honeypot_api()
+    └── architecture.md                    # Detailed architecture documentation
 ```
 
 ## License

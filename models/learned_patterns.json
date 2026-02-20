@@ -2,65 +2,65 @@
   "digital_arrest:send otp": {
     "pattern_type": "digital_arrest",
     "pattern_text": "send otp",
-    "frequency": 118,
+    "frequency": 120,
     "first_seen": "2026-02-11T16:03:49.717369+00:00",
-    "last_seen": "2026-02-20T14:03:42.078801+00:00",
+    "last_seen": "2026-02-20T14:19:31.030217+00:00",
     "confidence": 0.99
   },
   "digital_arrest:otp immediately": {
     "pattern_type": "digital_arrest",
     "pattern_text": "otp immediately",
-    "frequency": 118,
+    "frequency": 120,
     "first_seen": "2026-02-11T16:03:49.717369+00:00",
-    "last_seen": "2026-02-20T14:03:42.078801+00:00",
+    "last_seen": "2026-02-20T14:19:31.030217+00:00",
     "confidence": 0.99
   },
   "digital_arrest:send otp immediately": {
     "pattern_type": "digital_arrest",
     "pattern_text": "send otp immediately",
-    "frequency": 59,
+    "frequency": 60,
     "first_seen": "2026-02-11T16:03:49.717369+00:00",
-    "last_seen": "2026-02-20T14:03:42.078801+00:00",
+    "last_seen": "2026-02-20T14:19:31.030217+00:00",
     "confidence": 0.99
   },
   "digital_arrest:otp immediately or": {
     "pattern_type": "digital_arrest",
     "pattern_text": "otp immediately or",
-    "frequency": 59,
+    "frequency": 60,
     "first_seen": "2026-02-11T16:03:49.717369+00:00",
-    "last_seen": "2026-02-20T14:03:42.078801+00:00",
+    "last_seen": "2026-02-20T14:19:31.030217+00:00",
     "confidence": 0.99
   },
   "digital_arrest:immediately or account": {
     "pattern_type": "digital_arrest",
     "pattern_text": "immediately or account",
-    "frequency": 59,
+    "frequency": 60,
     "first_seen": "2026-02-11T16:03:49.717369+00:00",
-    "last_seen": "2026-02-20T14:03:42.078801+00:00",
+    "last_seen": "2026-02-20T14:19:31.030217+00:00",
     "confidence": 0.99
   },
   "digital_arrest:or account blocked": {
     "pattern_type": "digital_arrest",
     "pattern_text": "or account blocked",
-    "frequency": 59,
+    "frequency": 60,
     "first_seen": "2026-02-11T16:03:49.717369+00:00",
-    "last_seen": "2026-02-20T14:03:42.078801+00:00",
+    "last_seen": "2026-02-20T14:19:31.030217+00:00",
     "confidence": 0.99
   },
   "digital_arrest:send otp immediately or": {
     "pattern_type": "digital_arrest",
     "pattern_text": "send otp immediately or",
-    "frequency": 59,
+    "frequency": 60,
     "first_seen": "2026-02-11T16:03:49.717369+00:00",
-    "last_seen": "2026-02-20T14:03:42.078801+00:00",
+    "last_seen": "2026-02-20T14:19:31.030217+00:00",
     "confidence": 0.99
   },
   "digital_arrest:otp immediately or account": {
     "pattern_type": "digital_arrest",
     "pattern_text": "otp immediately or account",
-    "frequency": 59,
+    "frequency": 60,
     "first_seen": "2026-02-11T16:03:49.717369+00:00",
-    "last_seen": "2026-02-20T14:03:42.078801+00:00",
+    "last_seen": "2026-02-20T14:19:31.030217+00:00",
     "confidence": 0.99
   }
 }
