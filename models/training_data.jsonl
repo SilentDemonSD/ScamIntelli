@@ -3422,3 +3422,11 @@
 {"message": "Bank fraud: account 1111111111111111", "is_scam": true, "timestamp": "2026-02-17T13:23:57.846184+00:00"}
 {"message": "Scam message turn 4. Pay now!", "is_scam": true, "timestamp": "2026-02-17T13:26:52.728834+00:00"}
 {"message": "Scam message turn 5. Pay now!", "is_scam": true, "timestamp": "2026-02-17T13:26:52.905243+00:00"}
+{"message": "URGENT: Your SBI account compromised! Call +91-9876543210 immediately to save your money. OTP required.", "is_scam": true, "timestamp": "2026-02-20T13:42:40.987405+00:00"}
+{"message": "URGENT: Your SBI account compromised! Call +91-9876543210 to save your money.", "is_scam": true, "timestamp": "2026-02-20T13:43:01.317148+00:00"}
+{"message": "I am calling from SBI fraud dept. My employee ID is EMP-4567. Give me your account number 1234567890123456.", "is_scam": true, "timestamp": "2026-02-20T13:43:01.574732+00:00"}
+{"message": "Sir your UPI ID scammer@fakeupi needs verification. Send Rs 500 to verify.", "is_scam": true, "timestamp": "2026-02-20T13:43:01.822909+00:00"}
+{"message": "Send money through this link: http://fake-sbi.com/verify. Your case ID is CASE-2024-789.", "is_scam": true, "timestamp": "2026-02-20T13:43:02.047943+00:00"}
+{"message": "Hi, good morning!", "is_scam": false, "timestamp": "2026-02-20T14:00:33.837368+00:00"}
+{"message": "Good morning! How is the weather today?", "is_scam": false, "timestamp": "2026-02-20T14:00:37.531988+00:00"}
+{"message": "Click http://fake-bank.xyz/kyc to verify KYC or blocked.", "is_scam": true, "timestamp": "2026-02-20T14:02:37.704474+00:00"}

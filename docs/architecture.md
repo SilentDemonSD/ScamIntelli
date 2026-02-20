@@ -204,6 +204,7 @@ The API gateway handles all HTTP routing, authentication, and request validation
 | Route | Method | Auth | Purpose |
 |-------|--------|------|---------|
 | `/api/v1/honeypot` | POST | API key | Main honeypot conversation endpoint |
+| `/api/v1/detect` | POST | API key | Standalone scam detection (no engagement) |
 | `/api/v1/message` | POST | API key | Alternative message endpoint |
 | `/api/v1/session/{id}` | GET | API key | Retrieve session details |
 | `/api/v1/session/{id}/end` | POST | API key | End session, get final report |
@@ -304,7 +305,7 @@ Input Message
                       │
                       ▼
               Final Confidence Score
-              (0.0 → 1.0, threshold: 0.7)
+              (0.0 → 1.0, threshold: 0.4)
 ```
 
 ### Score Weighting
@@ -320,7 +321,7 @@ When the ML ensemble is available, the scoring weights are:
 
 ### Scam Type Classification
 
-The system classifies detected scams into categories: `bank_fraud`, `upi_fraud`, `phishing`, `digital_arrest`, `investment_fraud`, `lottery_scam`, `tech_support`, `job_scam`, `insurance_fraud`, `identity_theft`. Classification uses both keyword-based rules and intelligence-based override (e.g., presence of UPI IDs → `upi_fraud`).
+The system classifies detected scams into 19 categories: `bank_fraud`, `upi_fraud`, `phishing`, `kyc_phishing`, `digital_arrest`, `investment_fraud`, `lottery_prize`, `tech_support`, `job_scam`, `romance_scam`, `customs_parcel`, `loan_fraud`, `crypto_scam`, `deepfake_impersonation`, `sim_swap`, `qr_code_scam`, `refund_scam`, `sextortion`, `unknown`. Each category has a `ScamProfile` (severity 1-10, typical tactics, recommended persona, max turns). Classification uses keyword-based rules (16 keyword categories via `SCAM_CATEGORY_KEYWORDS`) and intelligence-based override (e.g., presence of UPI IDs → `upi_fraud`).
 
 ---
 
@@ -337,6 +338,14 @@ The system classifies detected scams into categories: `bank_fraud`, `upi_fraud`,
 | UPI IDs | Regex (@provider patterns) | `user@paytm`, `user@ybl` |
 | Phishing Links | URL pattern matching | `http://fake-bank.com/verify` |
 | Email Addresses | Standard email regex | `scammer@example.com` |
+| Case IDs | Reference/case number patterns | `CBI-2025-001234` |
+| Policy Numbers | Insurance policy patterns | `POL-123456789` |
+| Order Numbers | Order ID patterns | `ORD-2025-5678` |
+| Organization Names | NLP entity extraction | `SBI Fraud Department` |
+| Addresses | Location pattern matching | `123 MG Road, Mumbai` |
+| Employee IDs | ID pattern extraction | `EMP-SBI-12345` |
+| Names Mentioned | Name entity extraction | `Inspector Rajesh Kumar` |
+| Suspicious Keywords | Scam vocabulary detection | `OTP`, `verify`, `blocked` |
 
 ### Phone Number Handling
 
@@ -366,6 +375,41 @@ Builds in-memory graphs of connected entities to identify:
 - Common bank accounts
 - Linked UPI IDs
 - Cluster membership
+
+---
+
+## Question Engine & Red Flag Tracker
+
+**Modules**: `src/agent_controller/question_engine.py`, `src/agent_controller/red_flag_tracker.py`
+
+### Question Engine
+
+The question engine generates investigative questions to maximize intelligence extraction and engagement quality.
+
+**Architecture**:
+- `IntelligenceExtractionPlanner` determines the highest-priority missing intel type for the current scam category and turn.
+- `QuestionBank` stores category-specific questions for 16 scam types + 15 general investigative questions.
+- 9 question types: Identity Verification, Organization Details, Contact Verification, Process Verification, Authority Challenge, Time Stalling, Payment Clarification, Technical Confusion, Technical Details.
+- Probing follow-ups (6 trigger types: `phone_mentioned`, `upi_mentioned`, `link_mentioned`, `organization_mentioned`, `email_mentioned`, `case_mentioned`) fire automatically when specific entity types are extracted.
+
+### Red Flag Tracker
+
+Detects 12 behavioral indicators in scammer messages and generates targeted probing questions:
+
+- Urgency escalation
+- Credential requests (OTP, password, PIN)
+- Authority impersonation
+- Threat patterns (account block, arrest)
+- Payment pressure
+- Identity probing
+- Time pressure tactics
+- Social engineering patterns
+- Information inconsistencies
+- Communication channel switching
+- Emotional manipulation
+- Verification resistance
+
+**Flow**: `RedFlagDetector.detect_red_flags()` runs every turn → flags accumulate in `session.red_flags_detected` → `RedFlagProber.should_probe_now()` decides timing → `RedFlagProber.generate_probing_question()` creates targeted probes.
 
 ---
 
@@ -467,10 +511,14 @@ Each session stores:
 - Session ID (UUID)
 - Conversation history (list of messages)
 - Scam detection state (type, confidence, is_detected)
-- Extracted intelligence (accumulated across turns)
+- Extracted intelligence (accumulated across turns, 13 categories)
 - Engagement metrics (start time, turn count, duration)
-- Persona assignment
+- Persona assignment (type, scam category)
+- Red flags detected (list of behavioral indicators with turn context)
+- Detection details (layer-by-layer scores)
+- Confidence level (0.0–1.0)
 - Client metadata (IP, user-agent)
+- Timestamps (created_at, last_updated)
 
 ### Distributed Locking
 
@@ -728,15 +776,18 @@ Scammer Message (Turn N)
 │     ├─ ML ensemble inference                    │
 │     ├─ Hard indicator check                     │
 │     └─ Gemini LLM verification                  │
-│  5. Extract intelligence                        │
-│  6. Select/apply persona                        │
-│  7. Generate response via Gemini                │
-│  8. Update session in Redis                     │
-│  9. Enqueue background tasks:                   │
-│     ├─ GUVI callback                            │
-│     ├─ Neo4j graph update                       │
-│     └─ Behavioral fingerprint update            │
-│  10. Return JSON response                       │
+│  5. Extract intelligence (13 categories)        │
+│  6. Detect red flags (12 behavioral indicators)  │
+│  7. Select/apply persona                        │
+│  8. Generate response via Gemini                │
+│  9. Append investigative question (question engine)│
+│  10. Update session in Redis                    │
+│  11. Dispatch callback (every turn):            │
+│      └─ GUVI callback with full session analysis │
+│  12. Enqueue background tasks:                  │
+│      ├─ Neo4j graph update                      │
+│      └─ Behavioral fingerprint update           │
+│  13. Return JSON response                       │
 └─────────────────────────────────────────────────┘
 ```
 

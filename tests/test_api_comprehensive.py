@@ -493,7 +493,7 @@ class TestEngagementStrategy:
         session = SessionState(
             session_id="test-intel",
             persona_style=PersonaStyle.CONFUSED,
-            turn_count=9,
+            turn_count=10,
             extracted_intel=intel,
         )
         should_continue, reason = EngagementStrategy.should_continue_engagement(
@@ -595,7 +595,7 @@ class TestResponseSelfCorrector:
     def test_too_long_response_detected(self):
         from src.persona_engine.personas import PersonaType, ResponseSelfCorrector
 
-        long_response = "Haan ji " * 50  # > 200 chars
+        long_response = "Haan ji " * 100  # > 500 chars
         is_valid, issues = ResponseSelfCorrector.validate_response(
             long_response, PersonaType.TECH_NAIVE
         )

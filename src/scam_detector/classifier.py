@@ -170,7 +170,10 @@ async def detect_scam(message: str) -> ScamScore:
     is_scam = (
         total_score >= settings.scam_threshold
         or intent_score >= 0.5
-        or (keyword_score >= 0.4 and pattern_score >= 0.3)
+        or keyword_score >= 0.5
+        or (keyword_score >= 0.3 and intent_score >= 0.2)
+        or (keyword_score >= 0.4 and pattern_score >= 0.2)
+        or pattern_score >= 0.5
     )
 
     return ScamScore(

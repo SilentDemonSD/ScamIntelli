@@ -8,7 +8,6 @@ from src.agent_controller.agent_state import (
 )
 from src.agent_controller.strategy import (
     _describe_missing_intel,
-    _get_intel_extraction_question,
 )
 from src.models import ExtractedIntelligence, PersonaStyle, SessionState
 
@@ -114,25 +113,9 @@ def test_describe_missing_intel_empty_when_complete():
         email_addresses=["x@y.com"],
         bank_accounts=["123456789"],
         phishing_links=["http://fake.com"],
+        case_ids=["CASE-001"],
+        organization_names=["SBI"],
+        names_mentioned=["Ravi Kumar"],
     )
     desc = _describe_missing_intel(intel)
     assert desc == ""
-
-
-def test_get_intel_extraction_question_turn_8_plus():
-    """After turn 7, should still return questions for missing intel."""
-    intel = ExtractedIntelligence()  # everything missing
-    for turn in (8, 9, 10, 12):
-        question = _get_intel_extraction_question(turn, intel)
-        assert question, f"Should return a question at turn {turn}"
-
-
-def test_get_intel_extraction_question_stops_when_complete():
-    """Should return empty string when all intel is already collected."""
-    intel = ExtractedIntelligence(
-        phone_numbers=["+919876543210"],
-        upi_ids=["fraud@ybl"],
-        email_addresses=["x@y.com"],
-    )
-    question = _get_intel_extraction_question(10, intel)
-    assert question == ""

@@ -86,6 +86,14 @@ class ExtractedIntelligence(BaseModel):
     phone_numbers: List[str] = Field(default_factory=list)
     email_addresses: List[str] = Field(default_factory=list)
     suspicious_keywords: List[str] = Field(default_factory=list)
+    # Extended intelligence fields for comprehensive extraction
+    case_ids: List[str] = Field(default_factory=list)
+    policy_numbers: List[str] = Field(default_factory=list)
+    order_numbers: List[str] = Field(default_factory=list)
+    organization_names: List[str] = Field(default_factory=list)
+    addresses: List[str] = Field(default_factory=list)
+    employee_ids: List[str] = Field(default_factory=list)
+    names_mentioned: List[str] = Field(default_factory=list)
 
 
 class GuviExtractedIntelligence(BaseModel):
@@ -95,6 +103,13 @@ class GuviExtractedIntelligence(BaseModel):
     phoneNumbers: List[str] = Field(default_factory=list)
     emailAddresses: List[str] = Field(default_factory=list)
     suspiciousKeywords: List[str] = Field(default_factory=list)
+    caseIds: List[str] = Field(default_factory=list)
+    policyNumbers: List[str] = Field(default_factory=list)
+    orderNumbers: List[str] = Field(default_factory=list)
+    organizationNames: List[str] = Field(default_factory=list)
+    addresses: List[str] = Field(default_factory=list)
+    employeeIds: List[str] = Field(default_factory=list)
+    namesMentioned: List[str] = Field(default_factory=list)
 
 
 class SessionState(BaseModel):
@@ -115,6 +130,7 @@ class SessionState(BaseModel):
     detection_details: Optional[dict] = Field(default=None)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     last_updated: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    red_flags_detected: List[dict] = Field(default_factory=list)
 
 
 class GuviCallbackPayload(BaseModel):
@@ -123,6 +139,8 @@ class GuviCallbackPayload(BaseModel):
     scamDetected: bool
     scamType: str = Field(default="unknown")
     totalMessagesExchanged: int
+    engagementDurationSeconds: int = Field(default=0)
+    confidenceLevel: float = Field(default=0.85)
     extractedIntelligence: GuviExtractedIntelligence
     engagementMetrics: EngagementMetrics = Field(
         default_factory=EngagementMetrics
