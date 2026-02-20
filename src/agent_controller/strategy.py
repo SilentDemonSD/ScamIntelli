@@ -534,25 +534,24 @@ async def _process_message_inner(
         )
         session.persona_style = _map_persona_to_style(persona_type)
 
-    # --- Red Flag Detection (runs every turn where scam context exists) ---
-    if is_scam or session.scam_detected:
-        detected_flags = RedFlagDetector.detect_red_flags(
-            message, session.turn_count, session.messages
+    # --- Red Flag Detection (runs unconditionally to catch pre-detection flags) ---
+    detected_flags = RedFlagDetector.detect_red_flags(
+        message, session.turn_count, session.messages
+    )
+    for flag in detected_flags:
+        session.red_flags_detected.append(flag.to_dict())
+        logger.info(
+            "Session %s: Red flag %s detected (confidence %.2f)",
+            session.session_id, flag.flag_type.value, flag.confidence,
         )
-        for flag in detected_flags:
-            session.red_flags_detected.append(flag.to_dict())
-            logger.info(
-                "Session %s: Red flag %s detected (confidence %.2f)",
-                session.session_id, flag.flag_type.value, flag.confidence,
-            )
 
-        escalation = RedFlagDetector.analyze_behavioral_escalation(session.messages)
-        if escalation["escalation_detected"]:
-            logger.warning(
-                "Session %s: Escalation detected – speed: %s, pressure increasing: %s",
-                session.session_id, escalation["escalation_speed"],
-                escalation["pressure_increasing"],
-            )
+    escalation = RedFlagDetector.analyze_behavioral_escalation(session.messages)
+    if escalation["escalation_detected"]:
+        logger.warning(
+            "Session %s: Escalation detected – speed: %s, pressure increasing: %s",
+            session.session_id, escalation["escalation_speed"],
+            escalation["pressure_increasing"],
+        )
 
     session.extracted_intel = await extract_all_intelligence(
         message, session.extracted_intel

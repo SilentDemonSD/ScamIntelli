@@ -47,7 +47,7 @@ def _get_pattern(name: str) -> re.Pattern:
     """
     if name not in _PATTERNS:
         patterns = {
-            "upi": re.compile(r"[a-zA-Z0-9._\-]+@[a-zA-Z]+", re.IGNORECASE),
+            "upi": re.compile(r"[a-zA-Z0-9._\-]+@[a-zA-Z0-9]+", re.IGNORECASE),
             "phone": re.compile(
                 r"(?<!\d)(?:\+91[\s\-]?)?[6-9]\d{9}(?!\d)"
                 r"|(?:\+91[\s\-]?[6-9]\d{3}[\s\-]?\d{3}[\s\-]?\d{3})(?!\d)"
@@ -66,17 +66,24 @@ def _get_pattern(name: str) -> re.Pattern:
             # New patterns for extended intel extraction
             "case_id": re.compile(
                 r"\b(?:CASE|CID|REF|CMP|FIR|INV|INVEST|COMPLAINT|TKT|TICKET)"
-                r"[\s#/\-]?[\dA-Z\-/]{3,20}\b",
+                r"[#/\-]?(?=[\dA-Z\-/]*\d)[\dA-Z\-/]{3,20}\b"
+                r"|(?:case\s*(?:no|number|id|ref)(?:\s+is)?\s*[:=\-]?\s*)((?=[\dA-Z\-/]*\d)[A-Z0-9][A-Z0-9\-/]{2,20})"
+                r"|(?:reference\s*(?:no|number|id)(?:\s+is)?\s*[:=\-]?\s*)((?=[\dA-Z\-/]*\d)[A-Z0-9][A-Z0-9\-/]{2,20})"
+                r"|\b\d{4}[/\-](?:CR|FIR|GD|PS)[/\-]\d+\b",
                 re.IGNORECASE,
             ),
             "policy_number": re.compile(
                 r"\b(?:POL|POLICY|INS|LIC|CLM|CLAIM|INSURANCE)"
-                r"[\s#/\-]?[\dA-Z\-/]{3,20}\b",
+                r"[#/\-]?(?=[\dA-Z\-/]*\d)[\dA-Z\-/]{3,20}\b"
+                r"|(?:policy\s*(?:no|number|id)(?:\s+is)?\s*[:=\-]?\s*)((?=[\dA-Z\-/]*\d)[A-Z0-9][A-Z0-9\-/]{2,20})"
+                r"|(?:insurance\s*(?:no|number|id)(?:\s+is)?\s*[:=\-]?\s*)((?=[\dA-Z\-/]*\d)[A-Z0-9][A-Z0-9\-/]{2,20})",
                 re.IGNORECASE,
             ),
             "order_number": re.compile(
                 r"\b(?:ORD|ORDER|TRK|TRACK|TXN|TRANS|SHP|SHIP|AWB|CONSIGNMENT)"
-                r"[\s#/\-]?[\dA-Z\-/]{3,20}\b",
+                r"[#/\-]?(?=[\dA-Z\-/]*\d)[\dA-Z\-/]{3,20}\b"
+                r"|(?:order\s*(?:no|number|id)(?:\s+is)?\s*[:=\-]?\s*)((?=[\dA-Z\-/]*\d)[A-Z0-9][A-Z0-9\-/]{2,20})"
+                r"|(?:tracking\s*(?:no|number|id)(?:\s+is)?\s*[:=\-]?\s*)((?=[\dA-Z\-/]*\d)[A-Z0-9][A-Z0-9\-/]{2,20})",
                 re.IGNORECASE,
             ),
             "employee_id": re.compile(
@@ -121,6 +128,17 @@ BANK_CONTEXT_KEYWORDS: FrozenSet[str] = frozenset(
         "credited",
         "debited",
         "transaction",
+        "send",
+        "money",
+        "pay",
+        "paisa",
+        "rupees",
+        "deposit",
+        "savings",
+        "current",
+        "blocked",
+        "compromised",
+        "unauthorized",
     }
 )
 
@@ -234,7 +252,7 @@ async def extract_bank_references(
                     continue
             except ValueError:
                 pass
-        if len(match) >= 14 and match not in references:
+        if len(match) >= 11 and match not in references:
             references.append(match)
         elif has_bank_context and len(match) >= 9 and match not in references:
             references.append(match)
@@ -290,17 +308,22 @@ async def extract_case_ids(message: str) -> List[str]:
         List of normalized case IDs found in message.
     """
     try:
-        matches = _get_pattern("case_id").findall(message)
+        pat = _get_pattern("case_id")
+        result: List[str] = []
+        for m in pat.finditer(message):
+            # Full match or first non-empty group
+            val = m.group(0)
+            for g in m.groups():
+                if g:
+                    val = g
+                    break
+            cleaned = val.strip().upper()
+            if len(cleaned) >= 4 and cleaned not in result:
+                result.append(cleaned)
+        return result
     except (re.error, KeyError) as exc:
         logger.error("Regex error in case ID extraction: %s", exc)
         return []
-
-    result: List[str] = []
-    for m in matches:
-        cleaned = m.strip().upper()
-        if len(cleaned) >= 4 and cleaned not in result:
-            result.append(cleaned)
-    return result
 
 
 async def extract_policy_numbers(message: str) -> List[str]:
@@ -318,17 +341,21 @@ async def extract_policy_numbers(message: str) -> List[str]:
         List of normalized policy numbers.
     """
     try:
-        matches = _get_pattern("policy_number").findall(message)
+        pat = _get_pattern("policy_number")
+        result: List[str] = []
+        for m in pat.finditer(message):
+            val = m.group(0)
+            for g in m.groups():
+                if g:
+                    val = g
+                    break
+            cleaned = val.strip().upper()
+            if len(cleaned) >= 4 and cleaned not in result:
+                result.append(cleaned)
+        return result
     except (re.error, KeyError) as exc:
         logger.error("Regex error in policy number extraction: %s", exc)
         return []
-
-    result: List[str] = []
-    for m in matches:
-        cleaned = m.strip().upper()
-        if len(cleaned) >= 4 and cleaned not in result:
-            result.append(cleaned)
-    return result
 
 
 async def extract_order_numbers(message: str) -> List[str]:
@@ -347,17 +374,21 @@ async def extract_order_numbers(message: str) -> List[str]:
         List of normalized order/tracking numbers.
     """
     try:
-        matches = _get_pattern("order_number").findall(message)
+        pat = _get_pattern("order_number")
+        result: List[str] = []
+        for m in pat.finditer(message):
+            val = m.group(0)
+            for g in m.groups():
+                if g:
+                    val = g
+                    break
+            cleaned = val.strip().upper()
+            if len(cleaned) >= 4 and cleaned not in result:
+                result.append(cleaned)
+        return result
     except (re.error, KeyError) as exc:
         logger.error("Regex error in order number extraction: %s", exc)
         return []
-
-    result: List[str] = []
-    for m in matches:
-        cleaned = m.strip().upper()
-        if len(cleaned) >= 4 and cleaned not in result:
-            result.append(cleaned)
-    return result
 
 
 async def extract_organization_names(message: str) -> List[str]:
