@@ -139,6 +139,8 @@ class GuviCallbackPayload(BaseModel):
     scamDetected: bool
     scamType: str = Field(default="unknown")
     totalMessagesExchanged: int
+    engagementDurationSeconds: int = Field(default=0)
+    confidenceLevel: float = Field(default=0.85)
     extractedIntelligence: GuviExtractedIntelligence
     engagementMetrics: EngagementMetrics = Field(
         default_factory=EngagementMetrics

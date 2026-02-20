@@ -461,6 +461,33 @@ async def _process_message_inner(
         )
         session.persona_style = _map_persona_to_style(persona_type)
 
+    # Ensure scam_category and persona are always set when scam is detected.
+    # Handles honeypot mode where scamDetected is forced True externally
+    # but the first turn's detection may not have triggered persona selection.
+    if session.scam_detected and not session.scam_category:
+        if scam_category != ScamCategory.UNKNOWN:
+            session.scam_category = (
+                scam_category.value
+                if hasattr(scam_category, "value")
+                else str(scam_category)
+            )
+        else:
+            session.scam_category = "unknown"
+
+    if session.scam_detected and not session.persona_type:
+        cat_for_persona = _ensure_scam_category(session.scam_category)
+        persona_type = select_persona_for_scam(cat_for_persona, session.turn_count)
+        age_adaptation = AgeAdaptivePersonaEngine.adapt_persona(
+            persona_type,
+            session.scam_category or "unknown",
+            session.turn_count,
+        )
+        persona_type = age_adaptation.adapted_persona
+        session.persona_type = (
+            persona_type.value if hasattr(persona_type, "value") else str(persona_type)
+        )
+        session.persona_style = _map_persona_to_style(persona_type)
+
     # --- Red Flag Detection (runs every turn where scam context exists) ---
     if is_scam or session.scam_detected:
         detected_flags = RedFlagDetector.detect_red_flags(
@@ -599,7 +626,7 @@ async def _process_message_inner(
             scam_cat_q, session.turn_count, session.extracted_intel,
         )
 
-        if questions and session.turn_count >= 2:
+        if questions and session.turn_count >= 1:
             selected_question = questions[0]  # highest priority
             reply_text = f"{reply_text} {selected_question.question_text}"
             logger.info(

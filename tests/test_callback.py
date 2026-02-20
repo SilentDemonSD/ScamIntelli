@@ -13,6 +13,11 @@ from src.models import (
 
 @pytest.fixture
 def sample_session():
+    # Build messages list matching turn_count (10 scammer + 10 agent = 20)
+    messages = []
+    for i in range(10):
+        messages.append({"role": "scammer", "content": f"Scam message {i+1}"})
+        messages.append({"role": "agent", "content": f"Agent reply {i+1}"})
     return SessionState(
         session_id="test-session-callback",
         persona_style=PersonaStyle.CONFUSED,
@@ -26,7 +31,7 @@ def sample_session():
         confidence_level=0.9,
         scam_detected=True,
         engagement_active=False,
-        messages=[],
+        messages=messages,
     )
 
 
@@ -37,7 +42,7 @@ async def test_build_callback_payload(sample_session):
     assert isinstance(payload, GuviCallbackPayload)
     assert payload.sessionId == "test-session-callback"
     assert payload.scamDetected is True
-    assert payload.totalMessagesExchanged == 10
+    assert payload.totalMessagesExchanged == 20  # 10 scammer + 10 agent
     # Check the GuviExtractedIntelligence model has camelCase fields
     assert hasattr(payload.extractedIntelligence, "upiIds")
     assert "fraudster@upi" in payload.extractedIntelligence.upiIds
@@ -91,7 +96,20 @@ async def test_callback_payload_structure(sample_session):
         "phishingLinks",
         "phoneNumbers",
         "suspiciousKeywords",
+        "caseIds",
+        "policyNumbers",
+        "orderNumbers",
+        "organizationNames",
+        "employeeIds",
+        "namesMentioned",
+        "addresses",
     ]
 
     for field in intel_fields:
         assert field in payload_dict["extractedIntelligence"]
+
+    # Verify new top-level fields
+    assert "engagementDurationSeconds" in payload_dict
+    assert "confidenceLevel" in payload_dict
+    assert payload_dict["confidenceLevel"] > 0
+    assert payload_dict["engagementDurationSeconds"] >= 60  # floor
