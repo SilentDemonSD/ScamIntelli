@@ -42,6 +42,7 @@ class QuestionType(str, Enum):
     TIME_STALLING = "time_stalling"
     PAYMENT_CLARIFICATION = "payment_clarification"
     TECHNICAL_CONFUSION = "technical_confusion"
+    TECHNICAL_DETAILS = "technical_details"
 
 
 @dataclass
@@ -871,6 +872,224 @@ class QuestionBank:
                 turn_range=(4, 8),
             ),
         ],
+        ScamCategory.CRYPTO_SCAM: [
+            InvestigativeQuestion(
+                question_text="Sir kaunsa crypto exchange use karna hai? Platform ka naam batao.",
+                question_type=QuestionType.ORGANIZATION_DETAILS,
+                target_intelligence=["organization_names"],
+                priority=9,
+                scam_categories=[ScamCategory.CRYPTO_SCAM],
+                turn_range=(2, 6),
+            ),
+            InvestigativeQuestion(
+                question_text="Wallet address kaha pe bhejun? Aur aapka contact number de do confirmation ke liye.",
+                question_type=QuestionType.CONTACT_VERIFICATION,
+                target_intelligence=["phone_numbers"],
+                priority=9,
+                scam_categories=[ScamCategory.CRYPTO_SCAM],
+                turn_range=(2, 7),
+            ),
+            InvestigativeQuestion(
+                question_text="Minimum investment kitna hai? Payment kahan karna padega - UPI ya bank transfer?",
+                question_type=QuestionType.PAYMENT_CLARIFICATION,
+                target_intelligence=["upi_ids", "bank_accounts"],
+                priority=8,
+                scam_categories=[ScamCategory.CRYPTO_SCAM],
+                turn_range=(3, 7),
+            ),
+            InvestigativeQuestion(
+                question_text="Aapka referral link ya registration website kya hai?",
+                question_type=QuestionType.TECHNICAL_DETAILS,
+                target_intelligence=["phishing_links"],
+                priority=8,
+                scam_categories=[ScamCategory.CRYPTO_SCAM],
+                turn_range=(2, 8),
+            ),
+            InvestigativeQuestion(
+                question_text="Aap kaun ho bhai? Manager ya agent? Apna employee ID dena.",
+                question_type=QuestionType.IDENTITY_VERIFICATION,
+                target_intelligence=["employee_ids", "names_mentioned"],
+                priority=7,
+                scam_categories=[ScamCategory.CRYPTO_SCAM],
+                turn_range=(3, 7),
+            ),
+            InvestigativeQuestion(
+                question_text="Office kahan hai aapka? Main personally aake sign up karunga.",
+                question_type=QuestionType.ORGANIZATION_DETAILS,
+                target_intelligence=["addresses"],
+                priority=6,
+                scam_categories=[ScamCategory.CRYPTO_SCAM],
+                turn_range=(4, 8),
+            ),
+        ],
+        ScamCategory.SEXTORTION: [
+            InvestigativeQuestion(
+                question_text="Bhai kaun ho tum? Naam batao apna, police mein complaint karunga.",
+                question_type=QuestionType.IDENTITY_VERIFICATION,
+                target_intelligence=["names_mentioned"],
+                priority=9,
+                scam_categories=[ScamCategory.SEXTORTION],
+                turn_range=(2, 6),
+            ),
+            InvestigativeQuestion(
+                question_text="Paise kahan bhejne hai? UPI ID ya bank account number do.",
+                question_type=QuestionType.PAYMENT_CLARIFICATION,
+                target_intelligence=["upi_ids", "bank_accounts"],
+                priority=9,
+                scam_categories=[ScamCategory.SEXTORTION],
+                turn_range=(2, 7),
+            ),
+            InvestigativeQuestion(
+                question_text="Tum kahan se call kar rahe ho? Number kya hai tumhara?",
+                question_type=QuestionType.CONTACT_VERIFICATION,
+                target_intelligence=["phone_numbers"],
+                priority=8,
+                scam_categories=[ScamCategory.SEXTORTION],
+                turn_range=(2, 6),
+            ),
+            InvestigativeQuestion(
+                question_text="Email pe bhejo proof, mera lawyer dekhega. Tumhara email kya hai?",
+                question_type=QuestionType.CONTACT_VERIFICATION,
+                target_intelligence=["email_addresses"],
+                priority=7,
+                scam_categories=[ScamCategory.SEXTORTION],
+                turn_range=(3, 7),
+            ),
+            InvestigativeQuestion(
+                question_text="Kaunsi website se yeh sab hua? Link do toh main dekhunga.",
+                question_type=QuestionType.TECHNICAL_DETAILS,
+                target_intelligence=["phishing_links"],
+                priority=7,
+                scam_categories=[ScamCategory.SEXTORTION],
+                turn_range=(3, 8),
+            ),
+        ],
+        ScamCategory.QR_CODE_SCAM: [
+            InvestigativeQuestion(
+                question_text="Bhai pehle apna phone number de do, QR scan karne mein dikkat aa rahi hai.",
+                question_type=QuestionType.CONTACT_VERIFICATION,
+                target_intelligence=["phone_numbers"],
+                priority=9,
+                scam_categories=[ScamCategory.QR_CODE_SCAM],
+                turn_range=(2, 6),
+            ),
+            InvestigativeQuestion(
+                question_text="QR se payment nahi ho raha. UPI ID do direct transfer kar deta hun.",
+                question_type=QuestionType.PAYMENT_CLARIFICATION,
+                target_intelligence=["upi_ids"],
+                priority=9,
+                scam_categories=[ScamCategory.QR_CODE_SCAM],
+                turn_range=(2, 7),
+            ),
+            InvestigativeQuestion(
+                question_text="Tumhara naam kya hai? OLX pe profile name alag dikh raha hai.",
+                question_type=QuestionType.IDENTITY_VERIFICATION,
+                target_intelligence=["names_mentioned"],
+                priority=8,
+                scam_categories=[ScamCategory.QR_CODE_SCAM],
+                turn_range=(2, 6),
+            ),
+            InvestigativeQuestion(
+                question_text="Bank account number do, NEFT se kar deta hun. QR kaam nahi kar raha.",
+                question_type=QuestionType.PAYMENT_CLARIFICATION,
+                target_intelligence=["bank_accounts"],
+                priority=8,
+                scam_categories=[ScamCategory.QR_CODE_SCAM],
+                turn_range=(3, 7),
+            ),
+            InvestigativeQuestion(
+                question_text="Email pe invoice bhej do bhai, record ke liye chahiye.",
+                question_type=QuestionType.CONTACT_VERIFICATION,
+                target_intelligence=["email_addresses"],
+                priority=6,
+                scam_categories=[ScamCategory.QR_CODE_SCAM],
+                turn_range=(3, 8),
+            ),
+        ],
+        ScamCategory.SIM_SWAP: [
+            InvestigativeQuestion(
+                question_text="Aap kaunse telecom company se bol rahe ho? Employee ID kya hai?",
+                question_type=QuestionType.IDENTITY_VERIFICATION,
+                target_intelligence=["organization_names", "employee_ids"],
+                priority=9,
+                scam_categories=[ScamCategory.SIM_SWAP],
+                turn_range=(2, 6),
+            ),
+            InvestigativeQuestion(
+                question_text="Customer care number kya hai? Main verify karunga pehle.",
+                question_type=QuestionType.CONTACT_VERIFICATION,
+                target_intelligence=["phone_numbers"],
+                priority=9,
+                scam_categories=[ScamCategory.SIM_SWAP],
+                turn_range=(2, 7),
+            ),
+            InvestigativeQuestion(
+                question_text="Near store kahan hai? Main personally jaaunga SIM lene. Address do.",
+                question_type=QuestionType.ORGANIZATION_DETAILS,
+                target_intelligence=["addresses"],
+                priority=8,
+                scam_categories=[ScamCategory.SIM_SWAP],
+                turn_range=(3, 7),
+            ),
+            InvestigativeQuestion(
+                question_text="Email pe confirmation bhejo upgrade ki. Aapka official email kya hai?",
+                question_type=QuestionType.CONTACT_VERIFICATION,
+                target_intelligence=["email_addresses"],
+                priority=7,
+                scam_categories=[ScamCategory.SIM_SWAP],
+                turn_range=(3, 7),
+            ),
+            InvestigativeQuestion(
+                question_text="Reference number kya hai is request ka? Main note kar leta hun.",
+                question_type=QuestionType.PROCESS_VERIFICATION,
+                target_intelligence=["case_ids"],
+                priority=7,
+                scam_categories=[ScamCategory.SIM_SWAP],
+                turn_range=(3, 8),
+            ),
+        ],
+        ScamCategory.DEEPFAKE_IMPERSONATION: [
+            InvestigativeQuestion(
+                question_text="Sir aap kaun bol rahe ho? Full name aur designation batao.",
+                question_type=QuestionType.IDENTITY_VERIFICATION,
+                target_intelligence=["names_mentioned", "employee_ids"],
+                priority=9,
+                scam_categories=[ScamCategory.DEEPFAKE_IMPERSONATION],
+                turn_range=(2, 6),
+            ),
+            InvestigativeQuestion(
+                question_text="Aapka direct number kya hai? Main call back karunga verify karne ke liye.",
+                question_type=QuestionType.CONTACT_VERIFICATION,
+                target_intelligence=["phone_numbers"],
+                priority=9,
+                scam_categories=[ScamCategory.DEEPFAKE_IMPERSONATION],
+                turn_range=(2, 7),
+            ),
+            InvestigativeQuestion(
+                question_text="Kaunsi company se hai yeh request? Official email se verify karo.",
+                question_type=QuestionType.ORGANIZATION_DETAILS,
+                target_intelligence=["organization_names", "email_addresses"],
+                priority=8,
+                scam_categories=[ScamCategory.DEEPFAKE_IMPERSONATION],
+                turn_range=(2, 7),
+            ),
+            InvestigativeQuestion(
+                question_text="Payment kahan karna hai? Bank details ya UPI ID bhejo.",
+                question_type=QuestionType.PAYMENT_CLARIFICATION,
+                target_intelligence=["bank_accounts", "upi_ids"],
+                priority=8,
+                scam_categories=[ScamCategory.DEEPFAKE_IMPERSONATION],
+                turn_range=(3, 7),
+            ),
+            InvestigativeQuestion(
+                question_text="Office ka address bata do, main courier kar dunga documents.",
+                question_type=QuestionType.ORGANIZATION_DETAILS,
+                target_intelligence=["addresses"],
+                priority=6,
+                scam_categories=[ScamCategory.DEEPFAKE_IMPERSONATION],
+                turn_range=(4, 8),
+            ),
+        ],
     }
 
     # General questions applicable to ALL scam types
@@ -1192,6 +1411,26 @@ class IntelligenceExtractionPlanner:
         ScamCategory.REFUND_SCAM: [
             ("phone_numbers", 10), ("organization_names", 9), ("upi_ids", 8),
             ("case_ids", 8), ("bank_accounts", 7), ("email_addresses", 7),
+        ],
+        ScamCategory.CRYPTO_SCAM: [
+            ("phone_numbers", 10), ("organization_names", 9), ("upi_ids", 8),
+            ("phishing_links", 8), ("bank_accounts", 7), ("email_addresses", 7),
+        ],
+        ScamCategory.SEXTORTION: [
+            ("phone_numbers", 10), ("upi_ids", 9), ("bank_accounts", 9),
+            ("email_addresses", 8), ("names_mentioned", 7), ("phishing_links", 7),
+        ],
+        ScamCategory.QR_CODE_SCAM: [
+            ("upi_ids", 10), ("phone_numbers", 9), ("bank_accounts", 9),
+            ("names_mentioned", 7), ("email_addresses", 6),
+        ],
+        ScamCategory.SIM_SWAP: [
+            ("phone_numbers", 10), ("organization_names", 9), ("employee_ids", 8),
+            ("email_addresses", 7), ("case_ids", 7), ("addresses", 6),
+        ],
+        ScamCategory.DEEPFAKE_IMPERSONATION: [
+            ("phone_numbers", 10), ("names_mentioned", 9), ("organization_names", 9),
+            ("email_addresses", 8), ("bank_accounts", 7), ("employee_ids", 7),
         ],
     }
 

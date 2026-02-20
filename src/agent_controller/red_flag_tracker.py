@@ -21,6 +21,7 @@ Version: 2.0
 """
 
 import logging
+import re
 import random
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -161,7 +162,7 @@ class RedFlagDetector:
         },
         RedFlagType.AUTHORITY_CLAIM: {
             "keywords": [
-                "officer", "inspector", "police", "cbi", "ed", "customs",
+                "officer", "inspector", "police", "cbi", "enforcement directorate", "customs",
                 "bank manager", "rbi", "government", "ips", "ias",
                 "department", "official", "ministry", "magistrate",
                 "income tax", "cyber cell",
@@ -322,8 +323,16 @@ class RedFlagDetector:
             matched_content: List[str] = []
 
             # Keyword matching — each keyword hit adds confidence
+            # Use word boundary regex for short keywords (≤3 chars) to prevent
+            # substring false positives (e.g. "ed" matching inside "discussed")
             keywords = patterns.get("keywords", [])
-            matched_keywords = [kw for kw in keywords if kw in message_lower]
+            matched_keywords = []
+            for kw in keywords:
+                if len(kw) <= 3:
+                    if re.search(r'\b' + re.escape(kw) + r'\b', message_lower):
+                        matched_keywords.append(kw)
+                elif kw in message_lower:
+                    matched_keywords.append(kw)
             if matched_keywords:
                 confidence += len(matched_keywords) * 0.15
                 matched_content.extend(matched_keywords)

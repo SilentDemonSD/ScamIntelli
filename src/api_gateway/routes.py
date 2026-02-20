@@ -209,10 +209,11 @@ async def honeypot_endpoint(
         })
 
     # Build metrics block (also keep backward-compatible "engagementMetrics" key)
+    total_messages = len(
+        [m for m in session.messages if m.get("role") in ("scammer", "agent")]
+    )
     metrics_block = {
-        "totalMessagesExchanged": len(
-            [m for m in session.messages if m.get("role") in ("scammer", "agent")]
-        ),
+        "totalMessagesExchanged": total_messages,
         "engagementDurationSeconds": duration_seconds,
         "turnCount": session.turn_count,
         "personaUsed": getattr(session, "persona_type", None),
@@ -223,8 +224,9 @@ async def honeypot_endpoint(
     return JSONResponse(content={
         "status": "success",
         "reply": reply.reply,
+        # Required fields (2+2+2 pts)
+        "sessionId": session.session_id,
         "scamDetected": scam_detected,
-        "scamType": scam_type,
         "extractedIntelligence": {
             "phoneNumbers": intel.phone_numbers,
             "bankAccounts": intel.bank_accounts,
@@ -239,10 +241,17 @@ async def honeypot_endpoint(
             "namesMentioned": getattr(intel, "names_mentioned", []),
             "addresses": getattr(intel, "addresses", []),
         },
+        # Top-level metrics (1 pt combined)
+        "totalMessagesExchanged": total_messages,
+        "engagementDurationSeconds": duration_seconds,
+        # Optional scoring fields
+        "scamType": scam_type,
+        "confidenceLevel": round(getattr(session, "confidence_level", 0.0), 4),
+        "agentNotes": agent_notes,
+        # Backward-compatible nested metrics
         "engagementMetrics": metrics_block,
         "conversationMetrics": metrics_block,
         "redFlagsDetail": red_flags_detail,
-        "agentNotes": agent_notes,
     })
 
 
@@ -859,6 +868,9 @@ _SCAM_TYPE_MAP = {
     "crypto_scam": "crypto_scam",
     "refund_scam": "refund_scam",
     "sextortion": "sextortion",
+    "deepfake_impersonation": "deepfake_impersonation",
+    "sim_swap": "sim_swap",
+    "qr_code_scam": "qr_code_scam",
 }
 
 
@@ -866,6 +878,13 @@ def _map_scam_type(
     scam_category: str,
     intel: "ExtractedIntelligence | None" = None,
 ) -> str:
+    # Prefer detected category if available
+    if scam_category:
+        category_lower = scam_category.lower().strip()
+        mapped = _SCAM_TYPE_MAP.get(category_lower)
+        if mapped:
+            return mapped
+    # Fall back to intel-based inference
     if intel:
         if intel.phishing_links:
             return "phishing"
@@ -873,10 +892,9 @@ def _map_scam_type(
             return "upi_fraud"
         if intel.bank_accounts:
             return "bank_fraud"
-    if not scam_category:
-        return "unknown"
-    category_lower = scam_category.lower().strip()
-    return _SCAM_TYPE_MAP.get(category_lower, category_lower)
+    if scam_category:
+        return scam_category.lower().strip()
+    return "unknown"
 
 
 async def _extract_intel_from_history(
